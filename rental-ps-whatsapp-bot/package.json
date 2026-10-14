@@ -1,0 +1,24 @@
+{
+  "name": "rental-ps-whatsapp-bot",
+  "version": "1.0.0",
+  "description": "WhatsApp Bot Service untuk Sistem Penyewaan PS dengan AI Intent Processing & State Machine",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "test": "node --test tests/*.test.js"
+  },
+  "dependencies": {
+    "@open-wa/wa-automate": "^4.71.0",
+    "axios": "^1.7.2",
+    "dotenv": "^16.4.5"
+  },
+  "keywords": [
+    "whatsapp",
+    "bot",
+    "openwa",
+    "rental-ps"
+  ],
+  "author": "Antigravity Senior Architect",
+  "license": "ISC"
+}

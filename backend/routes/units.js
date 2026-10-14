@@ -1,0 +1,330 @@
+const express = require("express");
+const db = require("../db");
+const { requireAuth } = require("../middleware/auth");
+
+const router = express.Router();
+router.use(requireAuth);
+
+// Prepared Statements Pre-compiled at module scope
+const stmtSelectAllUnits = db.prepare("SELECT * FROM units ORDER BY id");
+const stmtSelectActiveSessionByUnit = db.prepare(
+  "SELECT * FROM sessions WHERE unit_id = ? AND status IN ('active', 'paused')"
+);
+const stmtSelectSessionAddons = db.prepare(
+  `SELECT sa.qty, a.id, a.name, a.price, a.stock
+   FROM session_addons sa JOIN addons a ON a.id = sa.addon_id
+   WHERE sa.session_id = ?`
+);
+const stmtSelectAllAddons = db.prepare("SELECT * FROM addons ORDER BY id");
+const stmtUpdateAddon = db.prepare("UPDATE addons SET name = ?, price = ?, stock = ? WHERE id = ?");
+const stmtInsertAddon = db.prepare("INSERT INTO addons (name, price, stock) VALUES (?, ?, ?)");
+const stmtDeleteAddon = db.prepare("DELETE FROM addons WHERE id = ?");
+const stmtSelectUnitById = db.prepare("SELECT * FROM units WHERE id = ?");
+const stmtInsertSession = db.prepare(
+  `INSERT INTO sessions (unit_id, customer_name, member_id, duration_mode, package_hours, status)
+   VALUES (?, ?, ?, ?, ?, 'active')`
+);
+const stmtInsertSessionAddon = db.prepare(
+  "INSERT INTO session_addons (session_id, addon_id, qty) VALUES (?, ?, ?)"
+);
+const stmtUpdateAddonStock = db.prepare("UPDATE addons SET stock = MAX(0, stock - ?) WHERE id = ?");
+const stmtUpdateUnitStatus = db.prepare("UPDATE units SET status = ? WHERE id = ?");
+const stmtSelectActiveSessionOnly = db.prepare(
+  "SELECT * FROM sessions WHERE unit_id = ? AND status = 'active'"
+);
+const stmtPauseSession = db.prepare(
+  "UPDATE sessions SET status = 'paused', paused_at = datetime('now') WHERE id = ?"
+);
+const stmtSelectPausedSessionOnly = db.prepare(
+  "SELECT * FROM sessions WHERE unit_id = ? AND status = 'paused'"
+);
+const stmtResumeSession = db.prepare(
+  "UPDATE sessions SET status = 'active', paused_at = NULL, total_paused_sec = ? WHERE id = ?"
+);
+const stmtUpdateSessionUnitId = db.prepare("UPDATE sessions SET unit_id = ? WHERE id = ?");
+const stmtSelectAddonsWithPrice = db.prepare(
+  `SELECT sa.qty, a.price FROM session_addons sa
+   JOIN addons a ON a.id = sa.addon_id WHERE sa.session_id = ?`
+);
+const stmtCloseSession = db.prepare("UPDATE sessions SET status = 'closed' WHERE id = ?");
+const stmtInsertTransaction = db.prepare(
+  `INSERT INTO transactions
+   (session_id, unit_id, unit_name, customer_name, member_id, duration_sec, rental_cost, addons_cost, discount_amount, discount_reason, total, payment_method)
+   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+);
+const stmtDeductMemberPoints = db.prepare("UPDATE members SET points = MAX(0, points - ?) WHERE id = ?");
+const stmtAddMemberPoints = db.prepare("UPDATE members SET points = points + ? WHERE id = ?");
+
+const stmtSelectAddonById = db.prepare("SELECT * FROM addons WHERE id = ?");
+const stmtUpdateSessionAddonQty = db.prepare(
+  "UPDATE session_addons SET qty = ? WHERE session_id = ? AND addon_id = ?"
+);
+const stmtDeleteSessionAddon = db.prepare(
+  "DELETE FROM session_addons WHERE session_id = ? AND addon_id = ?"
+);
+const stmtAdjustAddonStock = db.prepare(
+  "UPDATE addons SET stock = stock - ? WHERE id = ?"
+);
+
+// GET /api/units -> semua unit + sesi aktif / paused
+router.get("/", (req, res) => {
+  const units = stmtSelectAllUnits.all();
+  const withSessions = units.map((u) => {
+    if (u.status !== "active") return { ...u, session: null };
+    const session = stmtSelectActiveSessionByUnit.get(u.id);
+    if (!session) return { ...u, session: null };
+    const addons = stmtSelectSessionAddons.all(session.id);
+    return { ...u, session: { ...session, addons } };
+  });
+  res.json(withSessions);
+});
+
+// GET /api/units/addons -> daftar add-on yang tersedia
+router.get("/addons", (req, res) => {
+  res.json(stmtSelectAllAddons.all());
+});
+
+// POST /api/units/addons -> tambah / update add-on
+router.post("/addons", (req, res) => {
+  const { id, name, price, stock } = req.body;
+  if (!name || price === undefined) {
+    return res.status(400).json({ error: "Nama dan harga add-on wajib diisi." });
+  }
+
+  if (id) {
+    stmtUpdateAddon.run(name, Number(price), Number(stock || 0), Number(id));
+    res.json({ message: "Add-on berhasil diperbarui." });
+  } else {
+    const info = stmtInsertAddon.run(name, Number(price), Number(stock || 100));
+    res.json({ id: info.lastInsertRowid, name, price, stock });
+  }
+});
+
+// DELETE /api/units/addons/:id
+router.delete("/addons/:id", (req, res) => {
+  stmtDeleteAddon.run(req.params.id);
+  res.json({ message: "Add-on berhasil dihapus." });
+});
+
+// POST /api/units/:id/start
+router.post("/:id/start", (req, res) => {
+  const unitId = Number(req.params.id);
+  const { customerName, memberId, durationMode = "open", packageHours = 0, addons = [] } = req.body;
+
+  const unit = stmtSelectUnitById.get(unitId);
+  if (!unit) return res.status(404).json({ error: "Unit tidak ditemukan." });
+  if (unit.status === "active") {
+    return res.status(409).json({ error: "Unit sedang dipakai." });
+  }
+
+  const run = db.transaction(() => {
+    const info = stmtInsertSession.run(
+      unitId,
+      customerName || "Umum",
+      memberId || null,
+      durationMode,
+      Number(packageHours) || 0
+    );
+    const sessionId = info.lastInsertRowid;
+
+    for (const a of addons) {
+      if (a.qty > 0) {
+        stmtInsertSessionAddon.run(sessionId, a.id, a.qty);
+        stmtUpdateAddonStock.run(a.qty, a.id);
+      }
+    }
+
+    stmtUpdateUnitStatus.run("active", unitId);
+    return sessionId;
+  });
+
+  const sessionId = run();
+  res.json({ sessionId });
+});
+
+// POST /api/units/:id/pause
+router.post("/:id/pause", (req, res) => {
+  const unitId = Number(req.params.id);
+  const session = stmtSelectActiveSessionOnly.get(unitId);
+  if (!session) return res.status(404).json({ error: "Tidak ada sesi aktif untuk di-pause." });
+
+  stmtPauseSession.run(session.id);
+  res.json({ message: "Sesi berhasil di-pause." });
+});
+
+// POST /api/units/:id/resume
+router.post("/:id/resume", (req, res) => {
+  const unitId = Number(req.params.id);
+  const session = stmtSelectPausedSessionOnly.get(unitId);
+  if (!session) return res.status(404).json({ error: "Tidak ada sesi paused untuk dilanjutkan." });
+
+  const pausedMs = new Date(session.paused_at + "Z").getTime();
+  const pausedDurationSec = Math.max(0, Math.floor((Date.now() - pausedMs) / 1000));
+  const newTotalPausedSec = (session.total_paused_sec || 0) + pausedDurationSec;
+
+  stmtResumeSession.run(newTotalPausedSec, session.id);
+  res.json({ message: "Sesi dilanjutkan." });
+});
+
+// POST /api/units/:id/addons -> tambah / update makanan & minuman pada sesi berjalan
+router.post("/:id/addons", (req, res) => {
+  const unitId = Number(req.params.id);
+  const { addons = [] } = req.body; // [{ id, qty }]
+
+  const session = stmtSelectActiveSessionByUnit.get(unitId);
+  if (!session) {
+    return res.status(404).json({ error: "Tidak ada sesi aktif pada unit ini." });
+  }
+
+  const run = db.transaction(() => {
+    const currentItems = stmtSelectSessionAddons.all(session.id);
+    const currentMap = new Map(currentItems.map((a) => [a.id, a.qty]));
+
+    for (const item of addons) {
+      const addonId = Number(item.id);
+      const targetQty = Math.max(0, Number(item.qty) || 0);
+      const oldQty = currentMap.get(addonId) || 0;
+      const diff = targetQty - oldQty;
+
+      if (diff > 0) {
+        const addonInfo = stmtSelectAddonById.get(addonId);
+        if (!addonInfo) throw new Error("Item kantin tidak ditemukan.");
+        if (addonInfo.stock < diff) {
+          throw new Error(`Stok ${addonInfo.name} kurang (sisa ${addonInfo.stock}).`);
+        }
+      }
+
+      if (targetQty > 0) {
+        if (oldQty > 0) {
+          stmtUpdateSessionAddonQty.run(targetQty, session.id, addonId);
+        } else {
+          stmtInsertSessionAddon.run(session.id, addonId, targetQty);
+        }
+      } else if (oldQty > 0) {
+        stmtDeleteSessionAddon.run(session.id, addonId);
+      }
+
+      if (diff !== 0) {
+        stmtAdjustAddonStock.run(diff, addonId);
+      }
+    }
+  });
+
+  try {
+    run();
+    res.json({ message: "Pesanan makanan & minuman berhasil diperbarui." });
+  } catch (err) {
+    res.status(400).json({ error: err.message || "Gagal memperbarui pesanan." });
+  }
+});
+
+// POST /api/units/:id/switch -> pindah unit
+router.post("/:id/switch", (req, res) => {
+  const sourceUnitId = Number(req.params.id);
+  const { targetUnitId } = req.body;
+
+  if (!targetUnitId || sourceUnitId === Number(targetUnitId)) {
+    return res.status(400).json({ error: "Unit tujuan tidak valid." });
+  }
+
+  const session = stmtSelectActiveSessionByUnit.get(sourceUnitId);
+  if (!session) return res.status(404).json({ error: "Sesi asal tidak ditemukan." });
+
+  const targetUnit = stmtSelectUnitById.get(targetUnitId);
+  if (!targetUnit) return res.status(404).json({ error: "Unit tujuan tidak ditemukan." });
+  if (targetUnit.status === "active") {
+    return res.status(409).json({ error: "Unit tujuan sedang terpakai." });
+  }
+
+  db.transaction(() => {
+    stmtUpdateSessionUnitId.run(targetUnitId, session.id);
+    stmtUpdateUnitStatus.run("idle", sourceUnitId);
+    stmtUpdateUnitStatus.run("active", targetUnitId);
+  })();
+
+  res.json({ message: `Sesi berhasil dipindahkan ke ${targetUnit.name}.` });
+});
+
+// POST /api/units/:id/stop -> hitung total & catat transaksi
+router.post("/:id/stop", (req, res) => {
+  const unitId = Number(req.params.id);
+  const { paymentMethod, discountAmount = 0, discountReason = "", redeemPoints = 0 } = req.body;
+  if (!["cash", "qris", "transfer"].includes(paymentMethod)) {
+    return res.status(400).json({ error: "Metode pembayaran tidak valid." });
+  }
+
+  const unit = stmtSelectUnitById.get(unitId);
+  const session = stmtSelectActiveSessionByUnit.get(unitId);
+  if (!unit || !session) {
+    return res.status(404).json({ error: "Tidak ada sesi aktif pada unit ini." });
+  }
+
+  const addons = stmtSelectAddonsWithPrice.all(session.id);
+  const addonsCost = addons.reduce((s, a) => s + a.price * a.qty, 0);
+
+  const startMs = new Date(session.start_time + "Z").getTime();
+  let pausedSec = session.total_paused_sec || 0;
+  if (session.status === "paused" && session.paused_at) {
+    pausedSec += Math.floor((Date.now() - new Date(session.paused_at + "Z").getTime()) / 1000);
+  }
+
+  const rawDurationSec = Math.max(1, Math.floor((Date.now() - startMs) / 1000));
+  const activeDurationSec = Math.max(1, rawDurationSec - pausedSec);
+
+  let rentalCost = 0;
+  if (session.duration_mode === "package" && session.package_hours > 0) {
+    rentalCost = Math.round(session.package_hours * unit.rate);
+  } else {
+    rentalCost = Math.round((activeDurationSec / 3600) * unit.rate);
+  }
+
+  const pointDiscount = Number(redeemPoints) * 200; // 1 poin = Rp 200
+  const totalDiscount = Math.min(rentalCost + addonsCost, Number(discountAmount) + pointDiscount);
+  const total = Math.max(0, rentalCost + addonsCost - totalDiscount);
+
+  const run = db.transaction(() => {
+    stmtCloseSession.run(session.id);
+    stmtUpdateUnitStatus.run("idle", unitId);
+
+    const txInfo = stmtInsertTransaction.run(
+      session.id,
+      unitId,
+      unit.name,
+      session.customer_name,
+      session.member_id,
+      activeDurationSec,
+      rentalCost,
+      addonsCost,
+      totalDiscount,
+      discountReason || (redeemPoints > 0 ? `Tukar ${redeemPoints} Poin` : ""),
+      total,
+      paymentMethod
+    );
+
+    if (session.member_id) {
+      if (redeemPoints > 0) {
+        stmtDeductMemberPoints.run(Number(redeemPoints), session.member_id);
+      }
+      const earnedPoints = Math.floor(total / 10000);
+      stmtAddMemberPoints.run(earnedPoints, session.member_id);
+    }
+
+    return txInfo.lastInsertRowid;
+  });
+
+  const transactionId = run();
+  res.json({
+    transactionId,
+    durationSec: activeDurationSec,
+    rentalCost,
+    addonsCost,
+    discountAmount: totalDiscount,
+    total,
+    customerName: session.customer_name,
+    unitName: unit.name,
+    paymentMethod,
+    createdAt: new Date().toISOString(),
+  });
+});
+
+module.exports = router;

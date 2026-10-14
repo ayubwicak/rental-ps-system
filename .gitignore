@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.env
+backend/db/rental-ps.sqlite
+backend/db/rental-ps.sqlite-shm
+backend/db/rental-ps.sqlite-wal
+
+# managed by open-wa
+**.data.json
+**.node-persist**
+**_IGNORE_**
+# end managed by open-wa
