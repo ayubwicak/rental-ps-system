@@ -54,6 +54,7 @@ const stmtInsertTransaction = db.prepare(
 );
 const stmtDeductMemberPoints = db.prepare("UPDATE members SET points = MAX(0, points - ?) WHERE id = ?");
 const stmtAddMemberPoints = db.prepare("UPDATE members SET points = points + ? WHERE id = ?");
+const stmtSelectMemberById = db.prepare("SELECT * FROM members WHERE id = ?");
 
 const stmtSelectAddonById = db.prepare("SELECT * FROM addons WHERE id = ?");
 const stmtUpdateSessionAddonQty = db.prepare(
@@ -259,6 +260,26 @@ router.post("/:id/stop", (req, res) => {
     return res.status(404).json({ error: "Tidak ada sesi aktif pada unit ini." });
   }
 
+  const redeemPts = Math.max(0, Math.floor(Number(redeemPoints) || 0));
+  const discountValue = Math.max(0, Math.floor(Number(discountAmount) || 0));
+
+  // Validasi penukaran poin: wajib sesi member & saldo poin mencukupi
+  let member = null;
+  if (redeemPts > 0) {
+    if (!session.member_id) {
+      return res.status(400).json({ error: "Penukaran poin hanya bisa dilakukan pada sesi member." });
+    }
+    member = stmtSelectMemberById.get(session.member_id);
+    if (!member) {
+      return res.status(404).json({ error: "Member pada sesi ini tidak ditemukan." });
+    }
+    if ((member.points || 0) < redeemPts) {
+      return res
+        .status(400)
+        .json({ error: `Poin member tidak mencukupi (tersedia: ${member.points || 0} poin).` });
+    }
+  }
+
   const addons = stmtSelectAddonsWithPrice.all(session.id);
   const addonsCost = addons.reduce((s, a) => s + a.price * a.qty, 0);
 
@@ -278,8 +299,8 @@ router.post("/:id/stop", (req, res) => {
     rentalCost = Math.round((activeDurationSec / 3600) * unit.rate);
   }
 
-  const pointDiscount = Number(redeemPoints) * 200; // 1 poin = Rp 200
-  const totalDiscount = Math.min(rentalCost + addonsCost, Number(discountAmount) + pointDiscount);
+  const pointDiscount = redeemPts * 200; // 1 poin = Rp 200
+  const totalDiscount = Math.min(rentalCost + addonsCost, discountValue + pointDiscount);
   const total = Math.max(0, rentalCost + addonsCost - totalDiscount);
 
   const run = db.transaction(() => {
@@ -296,14 +317,14 @@ router.post("/:id/stop", (req, res) => {
       rentalCost,
       addonsCost,
       totalDiscount,
-      discountReason || (redeemPoints > 0 ? `Tukar ${redeemPoints} Poin` : ""),
+      discountReason || (redeemPts > 0 ? `Tukar ${redeemPts} Poin` : ""),
       total,
       paymentMethod
     );
 
     if (session.member_id) {
-      if (redeemPoints > 0) {
-        stmtDeductMemberPoints.run(Number(redeemPoints), session.member_id);
+      if (redeemPts > 0) {
+        stmtDeductMemberPoints.run(redeemPts, session.member_id);
       }
       const earnedPoints = Math.floor(total / 10000);
       stmtAddMemberPoints.run(earnedPoints, session.member_id);

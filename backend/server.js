@@ -1,3 +1,4 @@
+require("./env"); // muat variabel lingkungan dari backend/.env sebelum modul lain
 const express = require("express");
 const http = require("http");
 const { Server } = require("socket.io");
@@ -18,9 +19,25 @@ const transactionRoutes = require("./routes/transactions");
 const app = express();
 const server = http.createServer(app);
 
+// Daftar origin frontend yang diizinkan CORS (dipisah koma di env CORS_ORIGIN).
+// Request tanpa header Origin (curl, bot WhatsApp, same-origin) tetap diizinkan.
+const allowedOrigins = (process.env.CORS_ORIGIN || "")
+  .split(",")
+  .map((o) => o.trim())
+  .filter(Boolean);
+
+const corsOptions = {
+  origin(origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    return callback(null, false);
+  },
+};
+
 // Inisialisasi Socket.io untuk sinkronisasi real-time antar layar kasir
 const io = new Server(server, {
-  cors: { origin: "*" },
+  cors: corsOptions,
 });
 
 io.on("connection", (socket) => {
@@ -35,7 +52,7 @@ io.on("connection", (socket) => {
 
 // Middleware kompresi HTTP Gzip untuk efisiensi transfer data & file
 app.use(compression());
-app.use(cors());
+app.use(cors(corsOptions));
 app.use(express.json());
 
 // Sediakan akses Socket.io ke semua handler route API
@@ -92,6 +109,16 @@ if (fs.existsSync(frontendDist)) {
 }
 
 const PORT = process.env.PORT || 4000;
+server.on("error", (err) => {
+  if (err.code === "EADDRINUSE") {
+    console.error(
+      `\x1b[31m[Error] Port ${PORT} sudah dipakai proses lain. ` +
+        `Tutup proses tersebut atau jalankan dengan PORT berbeda, mis. PORT=4001 npm start\x1b[0m`
+    );
+    process.exit(1);
+  }
+  throw err;
+});
 server.listen(PORT, () => {
   console.log(`Rental PS System (Backend + Frontend + WebSocket) berjalan di http://localhost:${PORT}`);
 });

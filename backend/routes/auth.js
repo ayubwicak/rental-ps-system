@@ -29,9 +29,7 @@ router.post("/login", (req, res) => {
   }
 
   const isBcryptMatch = bcrypt.compareSync(trimmedPassword, user.password_hash);
-  const isSameUsernamePassword = trimmedPassword.toLowerCase() === user.username.toLowerCase();
-
-  if (!isBcryptMatch && !isSameUsernamePassword) {
+  if (!isBcryptMatch) {
     return res.status(401).json({ error: "Username atau password salah." });
   }
 
