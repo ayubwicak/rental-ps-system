@@ -94,9 +94,6 @@ export default function LoginScreen({ onLogin }) {
             {loading ? "Memproses..." : "Masuk"}
           </Btn>
         </form>
-        <p style={{ color: C.textDim }} className="text-center text-xs mt-4">
-          Akun bawaan: <b>admin</b> / <b>admin123</b> atau <b>admin1234</b> / <b>1234567</b>.
-        </p>
       </div>
     </div>
   );
