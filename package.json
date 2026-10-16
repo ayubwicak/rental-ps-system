@@ -5,7 +5,7 @@
   "private": true,
   "scripts": {
     "start": "node start.js",
-    "dev": "concurrently --names \"BACKEND,FRONTEND\" --prefix-colors \"cyan,magenta\" \"npm run dev --prefix backend\" \"npm run dev --prefix frontend\"",
+    "dev": "concurrently --kill-others-on-fail --names \"BACKEND,FRONTEND\" --prefix-colors \"cyan,magenta\" \"npm run dev --prefix backend\" \"npm run dev --prefix frontend\"",
     "build": "npm run build --prefix frontend",
     "seed": "npm run seed --prefix backend",
     "test": "npm test --prefix rental-ps-whatsapp-bot",
