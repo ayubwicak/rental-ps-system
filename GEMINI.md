@@ -47,8 +47,10 @@ Database menggunakan skema yang didefinisikan dalam `backend/db/schema.sql`. Set
 - **Kompatibilitas Native Addon**: Pastikan versi `better-sqlite3` yang digunakan kompatibel dengan versi Node.js yang berjalan (gunakan `better-sqlite3` versi `^13.0.0` untuk Node.js 24+ agar tidak terjadi crash `(env) != nullptr` saat exit).
 
 ### Autentikasi & Keamanan
-- **Hashing Password**: Menggunakan `bcryptjs` dengan salt round minimum `10`. *Jangan pernah mengembalikan `password_hash` ke respons API publik.*
-- **JWT & Authorization**: Gunakan Bearer Token (`jsonwebtoken`). Lindungi endpoint dengan middleware `requireAuth`.
+- **Hashing Password**: Menggunakan `bcryptjs` dengan salt round minimum `10`. *Jangan pernah mengembalikan `password_hash` ke respons API publik.* Login **hanya** boleh memverifikasi via `bcrypt.compareSync` — jangan pernah menambahkan jalur alternatif (mis. password == username).
+- **JWT & Authorization**: Gunakan Bearer Token (`jsonwebtoken`). Lindungi endpoint dengan middleware `requireAuth`. `JWT_SECRET` **wajib** dari `backend/.env` (dimuat `backend/env.js`); server gagal start jika kosong/nilai bawaan.
+- **CORS**: Daftar origin diizinkan dikontrol via env `CORS_ORIGIN` (dipisah koma) untuk Express & Socket.io. Default hanya origin dev (`localhost`/`127.0.0.1:5173`); kosongkan untuk same-origin saja (mode production single-server).
+- **Validasi Bisnis di Server**: Setiap aturan bisnis (mis. batas penukaran poin member) harus divalidasi di backend — jangan percaya nilai dari frontend.
 - **Role-Based Access Control (RBAC)**: Validasi `req.user.role === 'admin'` untuk endpoint manajemen user, penyesuaian tarif, atau penghapusan data sensitif.
 
 ### Realtime Synchronization (Socket.io)
@@ -88,10 +90,16 @@ Semua respons error dari Express API harus mengembalikan JSON dengan format yang
 
 | Perintah | Lokasi Run | Deskripsi |
 | :--- | :--- | :--- |
-| `npm run start` | Root (`/`) | Menjalankan aplikasi Single Server (`start.js`) |
+| `npm run dev` | Root (`/`) | Menjalankan backend (`node --watch`) + frontend (Vite) berdua; `/api` & WebSocket di-proxy Vite ke backend |
+| `npm run start` | Root (`/`) | Menjalankan aplikasi Single Server (`start.js`) — build frontend otomatis jika dist kosong/usang |
 | `npm run build` | Root (`/`) | Melakukan build frontend ke `frontend/dist` |
 | `npm run seed` | Root (`/`) | Mengisi database awal (`admin`/`admin123`, unit PS, addons) |
 | `npm run install:all` | Root (`/`) | Menginstal dependensi backend & frontend |
+
+### Aturan URL API Frontend
+- `VITE_API_URL` **wajib relatif** (`/api`) — di-mode dev lewat proxy Vite, di produksi same-origin dengan backend.
+- **Jangan** menyetel `VITE_API_URL` ke URL absolut `http://localhost:...` — nilai itu ter-bake ke bundle hasil build dan merusak akses dari device lain/produksi.
+- Jika port backend berbeda saat dev, set target proxy: `VITE_BACKEND_URL=http://localhost:4001 npm run dev`.
 
 ---
 

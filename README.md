@@ -23,9 +23,20 @@ Aplikasi langsung dapat diakses di browser melalui:
 
 ---
 
-## 2. Menjalankan Secara Terpisah (Opsional)
+## 2. Menjalankan Secara Terpisah (Mode Development)
 
-### Backend (database)
+Cara termudah — dari **root folder**, jalankan backend + frontend berdua sekaligus:
+
+```bash
+npm run dev
+```
+
+- Backend: `http://localhost:4000` (dengan hot-reload `node --watch`)
+- Frontend (Vite): `http://localhost:5173` — buka alamat ini di browser
+- Semua request `/api` dan WebSocket otomatis di-proxy Vite ke backend (tanpa CORS)
+- Jika salah satu proses mati, proses lain ikut dihentikan (`--kill-others-on-fail`)
+
+### Backend saja
 ```bash
 cd backend
 npm install
@@ -50,14 +61,20 @@ Database SQLite disimpan otomatis di `backend/db/rental-ps.sqlite` — tidak per
 
 Skema lengkap ada di `backend/db/schema.sql`.
 
-## 2. Menjalankan Frontend
-
+### Frontend saja (jarang diperlukan)
 ```bash
 cd frontend
 npm install
-cp .env.example .env       # sesuaikan VITE_API_URL jika backend tidak di localhost:4000
+cp .env.example .env       # VITE_API_URL=/api (relatif, lewat proxy Vite)
 npm run dev                 # jalan di http://localhost:5173
 ```
+
+Jika port backend berbeda dari 4000, set target proxy saat menjalankan:
+```bash
+VITE_BACKEND_URL=http://localhost:4001 npm run dev
+```
+
+Catatan: `VITE_API_URL` sengaja relatif (`/api`) — jangan di-set ke URL absolut `http://localhost:...` karena akan ter-bake ke bundle hasil build dan merusak akses dari device lain / produksi.
 
 ## 3. Mengimpor ke project React kamu sendiri
 
@@ -78,7 +95,7 @@ Kalau kamu sudah punya project React sendiri (bukan mulai dari nol dengan folder
 - Login memanggil `POST /api/auth/login`, menyimpan JWT di `localStorage`.
 - Setiap request API berikutnya mengirim header `Authorization: Bearer <token>`.
 - Logout menghapus token dari `localStorage` dan mengembalikan ke layar login.
-- Token berlaku 12 jam (`JWT_SECRET` & masa berlaku bisa diubah di `backend/middleware/auth.js`).
+- Token berlaku 12 jam (`JWT_SECRET` di-set melalui `backend/.env` — wajib berupa string acak yang aman; masa berlaku bisa diubah di `backend/middleware/auth.js`).
 
 ## 5. Menambah kasir/admin baru
 
@@ -98,5 +115,6 @@ console.log('User dibuat');
 
 ## 6. Deploy
 
-- **Backend**: bisa di-deploy ke VPS/host Node biasa (Railway, Render, Fly.io, VPS sendiri). File SQLite ikut dalam volume disk yang persisten — pastikan platform hosting menyediakan persistent storage, atau ganti ke Postgres/MySQL kalau butuh skala lebih besar (skema SQL-nya bisa diadaptasi).
-- **Frontend**: `npm run build` di folder `frontend` menghasilkan folder `dist/` statis yang bisa di-hosting di Vercel/Netlify/static hosting apa pun. Set `VITE_API_URL` ke alamat backend production saat build.
+- **Single server (direkomendasikan)**: jalankan `npm start` di VPS — backend melayani API + file `frontend/dist` dari satu port. Karena `VITE_API_URL=/api` (relatif), build frontend otomatis cocok untuk domain apa pun tanpa rebuild.
+- **Terpisah (opsional)**: `npm run build` di folder `frontend` menghasilkan `dist/` statis (Vercel/Netlify). Untuk pola ini, set `VITE_API_URL` ke alamat backend production **saat build** dan izinkan origin frontend di `CORS_ORIGIN` backend.
+- File SQLite ikut dalam volume disk yang persisten — pastikan platform hosting menyediakan persistent storage, atau ganti ke Postgres/MySQL kalau butuh skala lebih besar (skema SQL-nya bisa diadaptasi).
