@@ -6,10 +6,53 @@ const { templates, formatRupiah, formatDateIndo, formatBookingCode, parseBooking
 const config = require("../config/config");
 const logger = require("../utils/logger");
 
+const RATE_LIMIT_MAX = 20; // maksimal pesan per pengirim
+const RATE_LIMIT_WINDOW_MS = 60 * 1000; // per 1 menit
+
+function normalizePhone(value) {
+  return String(value || "").replace(/\D/g, "");
+}
+
 class MessageHandler {
+  constructor() {
+    this.senderRateMap = new Map();
+  }
+
+  isRateLimited(chatId) {
+    const now = Date.now();
+    // Bersihkan entri kedaluwarsa agar tidak menumpuk (anti memory leak)
+    for (const [key, record] of this.senderRateMap.entries()) {
+      if (now - record.startTime > RATE_LIMIT_WINDOW_MS) this.senderRateMap.delete(key);
+    }
+
+    const record = this.senderRateMap.get(chatId);
+    if (!record) {
+      this.senderRateMap.set(chatId, { count: 1, startTime: now });
+      return false;
+    }
+    record.count += 1;
+    return record.count > RATE_LIMIT_MAX;
+  }
+
+  // Booking hanya boleh dilihat/dibatalkan oleh nomor WhatsApp pemesannya.
+  isBookingOwner(booking, chatId) {
+    const stored = normalizePhone(booking?.customer_phone);
+    const requester = normalizePhone(chatId);
+    return Boolean(stored && requester && stored === requester);
+  }
+
+  bookingNotFoundMessage(bookingId) {
+    return `❌ Booking dengan ID *#${bookingId}* tidak ditemukan atau bukan milik nomor Anda.`;
+  }
+
   async handleIncomingMessage(chatId, messageBody) {
     const raw = (messageBody || "").trim();
     logger.info("MessageHandler", `Incoming from ${chatId}: "${raw}"`);
+
+    if (this.isRateLimited(chatId)) {
+      logger.warn("MessageHandler", `Rate limit terlampaui untuk ${chatId}.`);
+      return "⚠️ Terlalu banyak pesan dalam waktu singkat. Mohon tunggu sebentar sebelum mengirim pesan lagi.";
+    }
 
     // 1. Check Human Handoff Mode
     if (sessionManager.isHandoff(chatId)) {
@@ -150,6 +193,11 @@ Silakan coba jam atau hari lain dengan mengetik:
       const booking = await rentalApiService.getBookingById(bookingId);
       sessionManager.resetSession(chatId);
 
+      if (!this.isBookingOwner(booking, chatId)) {
+        logger.warn("MessageHandler", `Akses booking #${bookingId} ditolak untuk ${chatId} (bukan pemilik).`);
+        return this.bookingNotFoundMessage(bookingId);
+      }
+
       const statusMap = {
         menunggu: "🟡 Menunggu Check-in",
         terjadwal: "🟢 Terjadwal",
@@ -170,7 +218,7 @@ Tarif       : *${formatRupiah(booking.unit_rate)}/jam*`;
     } catch (err) {
       sessionManager.resetSession(chatId);
       if (err.response && err.response.status === 404) {
-        return `❌ Booking dengan ID *#${bookingId}* tidak ditemukan.`;
+        return this.bookingNotFoundMessage(bookingId);
       }
       return "Maaf, sistem rental sedang mengalami gangguan. Silakan coba beberapa saat lagi.";
     }
@@ -184,12 +232,22 @@ Tarif       : *${formatRupiah(booking.unit_rate)}/jam*`;
     }
 
     try {
-      const res = await rentalApiService.cancelBooking(bookingId);
+      const booking = await rentalApiService.getBookingById(bookingId);
       sessionManager.resetSession(chatId);
+
+      if (!this.isBookingOwner(booking, chatId)) {
+        logger.warn("MessageHandler", `Pembatalan booking #${bookingId} ditolak untuk ${chatId} (bukan pemilik).`);
+        return this.bookingNotFoundMessage(bookingId);
+      }
+
+      await rentalApiService.cancelBooking(bookingId);
       const codeStr = formatBookingCode(bookingId);
       return `✅ *PEMBATALAN BERHASIL*\n\nBooking Code *${codeStr}* telah berhasil dibatalkan.`;
     } catch (err) {
       sessionManager.resetSession(chatId);
+      if (err.response && err.response.status === 404) {
+        return this.bookingNotFoundMessage(bookingId);
+      }
       if (err.response && err.response.data && err.response.data.error) {
         return `❌ *GAGAL MEMBATALKAN BOOKING*\n\n${err.response.data.error}`;
       }

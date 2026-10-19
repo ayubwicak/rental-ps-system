@@ -69,8 +69,9 @@ Isi konfigurasi pada file `.env`:
 ```ini
 # URL & Kredensial Backend REST API
 RENTAL_API_URL=http://localhost:4000/api
-RENTAL_API_USERNAME=admin
-RENTAL_API_PASSWORD=admin123
+# Gunakan akun khusus bot (role kasir, bukan admin) — dibuat oleh `npm run seed` di backend
+RENTAL_API_USERNAME=bot
+RENTAL_API_PASSWORD=password-dari-output-npm-run-seed
 
 # Pengaturan AI (opsional)
 AI_PROVIDER=none

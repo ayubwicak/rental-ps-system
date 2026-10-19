@@ -12,6 +12,12 @@ class RentalApiService {
   }
 
   async login() {
+    if (!config.apiUsername || !config.apiPassword) {
+      throw new Error(
+        "Kredensial API bot belum diisi. Set RENTAL_API_USERNAME dan RENTAL_API_PASSWORD " +
+          "di rental-ps-whatsapp-bot/.env dengan akun bot khusus (jangan akun admin)."
+      );
+    }
     try {
       logger.info("RentalAPI", `Attempting login to ${config.apiUrl} as user: ${config.apiUsername}`);
       const res = await this.client.post("/auth/login", {
