@@ -47,7 +47,7 @@ npm run dev                 # jalan di http://localhost:4000
 
 Database SQLite disimpan otomatis di `backend/db/rental-ps.sqlite` — tidak perlu instalasi database server terpisah (MySQL/Postgres dsb).
 
-**Akun bawaan:** `admin` / `admin123` — segera ganti setelah login pertama (lewat query manual atau buat fitur ganti password).
+**Akun admin:** `npm run seed` membuat akun `admin` dengan password acak yang dicetak sekali di terminal (atau dari env `ADMIN_PASSWORD`). Jika password admin masih default lama (`admin123`), seed otomatis merotasinya dan mengakhiri semua sesi login. Ganti password kapan saja lewat menu **Pengaturan**. Seed juga membuat akun khusus bot (`bot`, role kasir) untuk WhatsApp bot.
 
 ### Struktur tabel utama
 - `users` — akun login (admin/kasir)
@@ -92,10 +92,14 @@ Kalau kamu sudah punya project React sendiri (bukan mulai dari nol dengan folder
 
 ## 4. Alur Login
 
-- Login memanggil `POST /api/auth/login`, menyimpan JWT di `localStorage`.
-- Setiap request API berikutnya mengirim header `Authorization: Bearer <token>`.
-- Logout menghapus token dari `localStorage` dan mengembalikan ke layar login.
-- Token berlaku 12 jam (`JWT_SECRET` di-set melalui `backend/.env` — wajib berupa string acak yang aman; masa berlaku bisa diubah di `backend/middleware/auth.js`).
+- Login memanggil `POST /api/auth/login`. Sesi disimpan pada cookie **httpOnly + SameSite=Strict** (bukan `localStorage`) sehingga tidak bisa dibaca JavaScript.
+- Setiap request API berikutnya otomatis menyertakan cookie sesi (`credentials: "include"`).
+- Endpoint non-browser (bot WhatsApp) tetap didukung: respons login menyertakan `token` untuk dipakai sebagai header `Authorization: Bearer <token>`.
+- Logout memanggil `POST /api/auth/logout` yang menghapus cookie sesi.
+- Token berlaku 12 jam (`JWT_SECRET` di-set melalui `backend/.env` — wajib berupa string acak yang aman).
+- Percobaan login gagal dibatasi: 10x/menit per IP dan 5x gagal per akun (terkunci 15 menit).
+- Disarankan mengaktifkan HTTPS: isi `HTTPS_KEY` & `HTTPS_CERT` di `backend/.env` (lihat `.env.example`) agar password & token tidak lewat jaringan tanpa enkripsi.
+- Aksi penting (login, transaksi, ubah user/add-on, dll) tercatat di tabel `audit_logs` dan bisa dilihat admin di menu Pengaturan → Log Aktivitas.
 
 ## 5. Menambah kasir/admin baru
 

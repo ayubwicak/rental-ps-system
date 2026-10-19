@@ -11,7 +11,7 @@ Aturan ini berlaku khusus untuk modul frontend di folder `frontend/`.
 ## 2. Struktur Komponen & State
 - Komponen UI ditempatkan dalam `src/components/`.
 - Halaman utama dan modul diletakkan di `src/App.jsx` atau folder tampilan terkait.
-- Gunakan `src/api.js` sebagai perantara tunggal panggilan HTTP ke backend. Header `Authorization: Bearer <token>` disertakan secara otomatis dari token di `localStorage`.
+- Gunakan `src/api.js` sebagai perantara tunggal panggilan HTTP ke backend. Sesi memakai cookie `httpOnly` (`credentials: "include"`) — jangan menyimpan token di `localStorage`.
 
 ## 3. Integrasi Realtime WebSocket
 - Komponen penyedia data unit/booking mendengarkan event Socket.io `sync_data`.

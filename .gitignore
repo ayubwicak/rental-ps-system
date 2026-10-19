@@ -10,3 +10,9 @@ backend/db/rental-ps.sqlite-wal
 **.node-persist**
 **_IGNORE_**
 # end managed by open-wa
+.cursor/
+.cursorrules
+.claude/
+.aider*
+.copilot*
+*.ai.md

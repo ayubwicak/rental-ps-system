@@ -47,8 +47,11 @@ Database menggunakan skema yang didefinisikan dalam `backend/db/schema.sql`. Set
 - **Kompatibilitas Native Addon**: Pastikan versi `better-sqlite3` yang digunakan kompatibel dengan versi Node.js yang berjalan (gunakan `better-sqlite3` versi `^13.0.0` untuk Node.js 24+ agar tidak terjadi crash `(env) != nullptr` saat exit).
 
 ### Autentikasi & Keamanan
-- **Hashing Password**: Menggunakan `bcryptjs` dengan salt round minimum `10`. *Jangan pernah mengembalikan `password_hash` ke respons API publik.* Login **hanya** boleh memverifikasi via `bcrypt.compareSync` — jangan pernah menambahkan jalur alternatif (mis. password == username).
-- **JWT & Authorization**: Gunakan Bearer Token (`jsonwebtoken`). Lindungi endpoint dengan middleware `requireAuth`. `JWT_SECRET` **wajib** dari `backend/.env` (dimuat `backend/env.js`); server gagal start jika kosong/nilai bawaan.
+- **Hashing Password**: Menggunakan `bcryptjs` dengan salt round minimum `10`. *Jangan pernah mengembalikan `password_hash` ke respons API publik.* Login **hanya** boleh memverifikasi via `bcrypt.compare` (async) — jangan pernah menambahkan jalur alternatif (mis. password == username). Gunakan `DUMMY_HASH` saat username tidak ditemukan agar waktu respons sama (anti user-enumeration).
+- **JWT & Authorization**: Gunakan Bearer Token (`jsonwebtoken`). Lindungi endpoint dengan middleware `requireAuth`. `JWT_SECRET` **wajib** dari `backend/.env` (dimuat `backend/env.js`); server gagal start jika kosong/nilai bawaan. Browser memakai cookie `httpOnly` + `SameSite=Strict` (`rentalku_token`); token dari cookie hanya diterima untuk request bermethod aman atau origin tepercaya (anti-CSRF lapis kedua). Endpoint non-browser tetap memakai header `Authorization: Bearer <token>`.
+- **Anti Brute-Force**: Rate limit per-IP di `middleware/rateLimiter.js` + lockout per akun (5x gagal → terkunci 15 menit).
+- **Audit Log**: Setiap mutasi penting wajib memanggil `logAudit(req, AKSI, detail)` (`utils/audit.js`) — mis. LOGIN, LOGIN_GAGAL, TRANSAKSI, SESI_MULAI, USER_*, ADDON_*, BOOKING_*.
+- **HTTPS**: Opsional via `HTTPS_KEY`/`HTTPS_CERT` di `backend/.env`; cookie otomatis menjadi `Secure` saat HTTPS aktif.
 - **CORS**: Daftar origin diizinkan dikontrol via env `CORS_ORIGIN` (dipisah koma) untuk Express & Socket.io. Default hanya origin dev (`localhost`/`127.0.0.1:5173`); kosongkan untuk same-origin saja (mode production single-server).
 - **Validasi Bisnis di Server**: Setiap aturan bisnis (mis. batas penukaran poin member) harus divalidasi di backend — jangan percaya nilai dari frontend.
 - **Role-Based Access Control (RBAC)**: Validasi `req.user.role === 'admin'` untuk endpoint manajemen user, penyesuaian tarif, atau penghapusan data sensitif.
@@ -61,7 +64,7 @@ Database menggunakan skema yang didefinisikan dalam `backend/db/schema.sql`. Set
 ## 4. Aturan Frontend (`frontend/`)
 
 - **Teknologi**: React + Vite + Tailwind CSS.
-- **Modul API Client (`src/api.js`)**: Mengatur panggilan HTTP ke `/api/*` dengan menyertakan header `Authorization: Bearer <token>`.
+- **Modul API Client (`src/api.js`)**: Mengatur panggilan HTTP ke `/api/*` dengan `credentials: "include"` (sesi cookie httpOnly). Jangan menyimpan token di `localStorage`. Handler 401 (`setUnauthorizedHandler`) mengembalikan UI ke halaman login.
 - **Manajemen State Realtime**: Komponen utama wajib mendengarkan event Socket.io `sync_data` untuk memperbarui data unit/booking secara langsung tanpa reload halaman.
 - **Format Mata Uang & Durasi**: Format angka biaya menggunakan standar Rupiah (`Rp X.XXX`) dan format durasi menggunakan hitungan jam/menit yang jelas.
 
@@ -93,7 +96,7 @@ Semua respons error dari Express API harus mengembalikan JSON dengan format yang
 | `npm run dev` | Root (`/`) | Menjalankan backend (`node --watch`) + frontend (Vite) berdua; `/api` & WebSocket di-proxy Vite ke backend |
 | `npm run start` | Root (`/`) | Menjalankan aplikasi Single Server (`start.js`) — build frontend otomatis jika dist kosong/usang |
 | `npm run build` | Root (`/`) | Melakukan build frontend ke `frontend/dist` |
-| `npm run seed` | Root (`/`) | Mengisi database awal (`admin`/`admin123`, unit PS, addons) |
+| `npm run seed` | Root (`/`) | Mengisi database awal (akun `admin` + password acak/`ADMIN_PASSWORD`, unit PS, addons) dan akun bot WhatsApp (`bot`, role kasir); merotasi password default lama |
 | `npm run install:all` | Root (`/`) | Menginstal dependensi backend & frontend |
 
 ### Aturan URL API Frontend
@@ -108,3 +111,17 @@ Semua respons error dari Express API harus mengembalikan JSON dengan format yang
 1. **Modifikasi File**: Jaga struktur file yang ada dan ikuti pola yang sudah terbentuk di codebase.
 2. **Bahasa Dokumentasi & Log**: Selalu tulis komentar kode, pesan error API, dan log konsol dalam **Bahasa Indonesia**.
 3. **Verifikasi Setelah Edit**: Setiap kali mengubah kode backend atau frontend, jalankan verifikasi runtime (`npm run start` atau tes endpoint API) sebelum menyatakan pekerjaan selesai.
+
+---
+
+## 8. Aturan Git, Commit & Push GitHub (SPEC-GIT-NO-AI)
+
+Repositori harus murni menampilkan identitas pemilik & tim (maks. 6 peserta) tanpa jejak bot/AI. Detail lengkap: `.agents/rules/git.md`.
+
+1. **Larangan Atribusi AI**: Jangan pernah menulis `Co-authored-by:` (Claude/Cursor/Copilot/Gemini/ChatGPT), `Generated by/with AI`, atau sejenisnya di pesan commit.
+2. **Agen AI Dilarang Commit/Push**: Terminal agen AI tidak boleh menjalankan `git commit`/`git push` secara otomatis — semua perintah git dijalankan manual oleh pengguna.
+3. **Identitas Git**: `git config user.name`/`user.email` wajib akun GitHub pribadi (bukan bot). Verifikasi dengan `git config --list`.
+4. **Git Hook Wajib Aktif**: `.git/hooks/commit-msg` (executable) otomatis menghapus baris atribusi AI dari pesan commit; jangan dihapus/dinonaktifkan.
+5. **Format Commit**: Conventional Commits bergaya developer manusia, mis. `feat(sesi): tambah mode paket`, `fix(kasir): perbaiki diskon poin`, `docs(readme): perbarui panduan`.
+6. **Prosedur Aman**: `git status` → `git add <file spesifik>` → `git commit -m "..."` → audit `git log -n 3 --pretty=format:"%h - %an <%ae> : %B"` → `git push`. File konfigurasi AI lokal (`.cursor/`, `.claude/`, `.aider*`, dll.) tidak boleh ter-commit (sudah ada di `.gitignore`).
+7. **Pembersihan**: Jika atribusi AI terlanjur masuk: `git commit --amend --author="Nama <email>"` (belum di-push) atau `git filter-branch -f --msg-filter 'sed -E "/Co-authored-by:/Id"' HEAD` (seluruh riwayat).
