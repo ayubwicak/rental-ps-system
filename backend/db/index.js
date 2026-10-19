@@ -25,4 +25,15 @@ try {
   // Ignore migration error if table does not exist yet
 }
 
+// Auto migration check for token_version column on users (invalidasi sesi JWT)
+try {
+  const userTableInfo = db.prepare("PRAGMA table_info(users)").all();
+  const hasTokenVersion = userTableInfo.some((col) => col.name === "token_version");
+  if (!hasTokenVersion) {
+    db.exec("ALTER TABLE users ADD COLUMN token_version INTEGER NOT NULL DEFAULT 0;");
+  }
+} catch (e) {
+  // Ignore migration error if table does not exist yet
+}
+
 module.exports = db;

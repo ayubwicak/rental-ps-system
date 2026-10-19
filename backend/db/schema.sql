@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS users (
   password_hash TEXT NOT NULL,
   name          TEXT NOT NULL,
   role          TEXT NOT NULL CHECK (role IN ('admin', 'kasir')) DEFAULT 'kasir',
+  token_version INTEGER NOT NULL DEFAULT 0,
   created_at    TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -86,6 +87,19 @@ CREATE TABLE IF NOT EXISTS bookings (
   created_at     TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- Jejak audit: siapa melakukan aksi penting (login, transaksi, ubah user, dll)
+CREATE TABLE IF NOT EXISTS audit_logs (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id    INTEGER,
+  username   TEXT NOT NULL DEFAULT '-',
+  role       TEXT,
+  action     TEXT NOT NULL,
+  detail     TEXT,
+  ip         TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE INDEX IF NOT EXISTS idx_sessions_unit ON sessions(unit_id, status);
 CREATE INDEX IF NOT EXISTS idx_transactions_created ON transactions(created_at);
 CREATE INDEX IF NOT EXISTS idx_bookings_date ON bookings(booking_date);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_created ON audit_logs(created_at);

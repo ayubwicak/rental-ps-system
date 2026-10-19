@@ -1,6 +1,7 @@
 const express = require("express");
 const db = require("../db");
 const { requireAuth } = require("../middleware/auth");
+const { logAudit } = require("../utils/audit");
 
 const router = express.Router();
 router.use(requireAuth);
@@ -51,6 +52,28 @@ function timeToMinutes(timeStr) {
   return (h || 0) * 60 + (m || 0);
 }
 
+// Validasi format tanggal YYYY-MM-DD yang benar-benar ada di kalender.
+function isValidDate(value) {
+  const s = String(value || "");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+  const d = new Date(s + "T00:00:00Z");
+  return !isNaN(d.getTime()) && s === d.toISOString().slice(0, 10);
+}
+
+// Validasi format jam HH:MM (00:00 - 23:59).
+function isValidTime(value) {
+  const match = /^(\d{2}):(\d{2})$/.exec(String(value || ""));
+  if (!match) return false;
+  return Number(match[1]) <= 23 && Number(match[2]) <= 59;
+}
+
+// Durasi booking: bilangan bulat 1-24 jam.
+function parseDurationHours(value) {
+  const n = Number(value);
+  if (!Number.isInteger(n) || n < 1 || n > 24) return null;
+  return n;
+}
+
 // GET /api/bookings
 router.get("/", (req, res) => {
   res.json(stmtSelectBookingsWithUnits.all());
@@ -62,8 +85,14 @@ router.get("/availability", (req, res) => {
   if (!date || !time) {
     return res.status(400).json({ error: "Tanggal (date) dan waktu (time) wajib diisi." });
   }
+  if (!isValidDate(date) || !isValidTime(time)) {
+    return res.status(400).json({ error: "Format tanggal atau waktu tidak valid." });
+  }
 
-  const reqDur = Number(durationHours) || 1;
+  const reqDur = parseDurationHours(durationHours);
+  if (reqDur === null) {
+    return res.status(400).json({ error: "Durasi harus bilangan bulat 1-24 jam." });
+  }
   const newStartMins = timeToMinutes(time);
   const newEndMins = newStartMins + reqDur * 60;
 
@@ -132,6 +161,11 @@ router.post("/:id/cancel", (req, res) => {
   }
 
   stmtCancelBooking.run(bookingId);
+  logAudit(
+    req,
+    "BOOKING_BATAL",
+    `Booking #${bookingId} (${booking.customer_name}, ${booking.booking_date} ${booking.booking_time}) dibatalkan`
+  );
   res.json({ ok: true, message: "Booking berhasil dibatalkan.", bookingId });
 });
 
@@ -142,8 +176,35 @@ router.post("/", (req, res) => {
     return res.status(400).json({ error: "Data booking belum lengkap." });
   }
 
+  const cleanName = String(customerName).trim();
+  if (cleanName.length < 2 || cleanName.length > 64) {
+    return res.status(400).json({ error: "Nama pelanggan harus 2-64 karakter." });
+  }
+
+  let cleanPhone = null;
+  if (customerPhone) {
+    cleanPhone = String(customerPhone).trim();
+    if (!/^[0-9+\-\s()]{6,20}$/.test(cleanPhone)) {
+      return res.status(400).json({ error: "Nomor telepon tidak valid (6-20 digit)." });
+    }
+  }
+
   const requestedUnitId = Number(unitId);
-  const requestedDur = Number(durationHours) || 1;
+  if (!Number.isInteger(requestedUnitId) || requestedUnitId <= 0) {
+    return res.status(400).json({ error: "Unit tidak valid." });
+  }
+  if (!stmtSelectUnitById.get(requestedUnitId)) {
+    return res.status(404).json({ error: "Unit tidak ditemukan." });
+  }
+
+  if (!isValidDate(date) || !isValidTime(time)) {
+    return res.status(400).json({ error: "Format tanggal atau waktu tidak valid." });
+  }
+
+  const requestedDur = parseDurationHours(durationHours);
+  if (requestedDur === null) {
+    return res.status(400).json({ error: "Durasi harus bilangan bulat 1-24 jam." });
+  }
   const newStartMins = timeToMinutes(time);
   const newEndMins = newStartMins + requestedDur * 60;
 
@@ -187,23 +248,25 @@ router.post("/", (req, res) => {
   const unitName = targetUnitInfo ? targetUnitInfo.name : `Unit ${requestedUnitId}`;
 
   const info = stmtInsertBooking.run(
-    customerName.trim(),
-    customerPhone ? String(customerPhone).trim() : null,
+    cleanName,
+    cleanPhone,
     requestedUnitId,
     date,
     time,
     requestedDur
   );
 
+  logAudit(req, "BOOKING_TAMBAH", `Booking #${info.lastInsertRowid}: ${cleanName} di ${unitName} (${date} ${time}, ${requestedDur} jam)`);
+
   if (req.io) {
     req.io.emit("new_booking_notification", {
       bookingId: info.lastInsertRowid,
-      customerName: customerName.trim(),
+      customerName: cleanName,
       unitName,
       date,
       time,
       durationHours: requestedDur,
-      isWhatsapp: !!customerPhone,
+      isWhatsapp: !!cleanPhone,
     });
   }
 
@@ -233,6 +296,8 @@ router.post("/:id/checkin", (req, res) => {
 
   const isDifferentUnit = finalUnitId !== booking.unit_id;
   txnCheckInBooking(finalUnitId, bookingId, booking.customer_name, booking.duration_hours || 1, isDifferentUnit);
+
+  logAudit(req, "BOOKING_CHECKIN", `Booking #${bookingId} (${booking.customer_name}) check-in ke ${unit.name}`);
 
   res.json({ ok: true, unitName: unit.name });
 });

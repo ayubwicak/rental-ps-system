@@ -1,5 +1,11 @@
 const rateLimitMap = new Map();
 
+// Pelacak kegagalan login per akun (anti brute-force terdistribusi per username)
+const loginFailures = new Map();
+const LOGIN_MAX_FAILS = 5;
+const LOGIN_FAIL_WINDOW_MS = 15 * 60 * 1000;
+const LOGIN_LOCK_MS = 15 * 60 * 1000;
+
 // Automatic cleanup every 5 minutes to prevent memory leak
 setInterval(() => {
   const now = Date.now();
@@ -7,6 +13,10 @@ setInterval(() => {
     if (now - data.startTime > data.windowMs) {
       rateLimitMap.delete(key);
     }
+  }
+  for (const [key, data] of loginFailures.entries()) {
+    const expired = now - data.firstAt > LOGIN_FAIL_WINDOW_MS && now > data.lockedUntil;
+    if (expired) loginFailures.delete(key);
   }
 }, 5 * 60 * 1000);
 
@@ -16,8 +26,8 @@ function createRateLimiter(options = {}) {
   const message = options.message || "Terlalu banyak permintaan. Silakan coba beberapa saat lagi.";
 
   return (req, res, next) => {
-    const ip = req.ip || req.headers["x-forwarded-for"] || req.socket.remoteAddress || "127.0.0.1";
-    const key = `${req.path}:${ip}`;
+    const ip = req.ip || req.socket.remoteAddress || "127.0.0.1";
+    const key = `${req.method}:${req.baseUrl}${req.path}:${ip}`;
     const now = Date.now();
 
     if (!rateLimitMap.has(key)) {
@@ -40,6 +50,42 @@ function createRateLimiter(options = {}) {
   };
 }
 
+// Mengembalikan sisa waktu lock (ms) jika akun sedang terkunci, 0 jika tidak.
+function getLoginLockRemaining(username) {
+  const key = String(username || "").trim().toLowerCase();
+  if (!key) return 0;
+  const data = loginFailures.get(key);
+  if (!data) return 0;
+  const remaining = data.lockedUntil - Date.now();
+  return remaining > 0 ? remaining : 0;
+}
+
+// Catat satu kegagalan login. Setelah LOGIN_MAX_FAILS dalam jendela waktu,
+// akun dikunci sementara agar password tidak bisa ditebak paksa.
+function registerLoginFailure(username) {
+  const key = String(username || "").trim().toLowerCase();
+  if (!key) return;
+  const now = Date.now();
+  let data = loginFailures.get(key);
+
+  if (!data || now - data.firstAt > LOGIN_FAIL_WINDOW_MS) {
+    data = { count: 0, firstAt: now, lockedUntil: 0 };
+    loginFailures.set(key, data);
+  }
+
+  data.count += 1;
+  if (data.count >= LOGIN_MAX_FAILS) {
+    data.lockedUntil = now + LOGIN_LOCK_MS;
+    data.count = 0;
+    data.firstAt = now;
+  }
+}
+
+function clearLoginFailures(username) {
+  const key = String(username || "").trim().toLowerCase();
+  if (key) loginFailures.delete(key);
+}
+
 const authRateLimiter = createRateLimiter({
   windowMs: 60 * 1000,
   max: 10,
@@ -56,4 +102,7 @@ module.exports = {
   createRateLimiter,
   authRateLimiter,
   apiRateLimiter,
+  getLoginLockRemaining,
+  registerLoginFailure,
+  clearLoginFailures,
 };

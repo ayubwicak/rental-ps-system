@@ -1,6 +1,7 @@
 const express = require("express");
 const db = require("../db");
-const { requireAuth } = require("../middleware/auth");
+const { requireAuth, requireAdmin } = require("../middleware/auth");
+const { logAudit } = require("../utils/audit");
 
 const router = express.Router();
 router.use(requireAuth);
@@ -92,18 +93,56 @@ router.post("/addons", (req, res) => {
     return res.status(400).json({ error: "Nama dan harga add-on wajib diisi." });
   }
 
+  const cleanName = String(name).trim();
+  if (cleanName.length < 2 || cleanName.length > 64) {
+    return res.status(400).json({ error: "Nama add-on harus 2-64 karakter." });
+  }
+
+  const cleanPrice = Number(price);
+  if (!Number.isInteger(cleanPrice) || cleanPrice < 0 || cleanPrice > 100000000) {
+    return res.status(400).json({ error: "Harga harus berupa angka bulat yang wajar." });
+  }
+
+  const cleanStock = Number(stock === undefined ? 0 : stock);
+  if (!Number.isInteger(cleanStock) || cleanStock < 0 || cleanStock > 1000000) {
+    return res.status(400).json({ error: "Stok harus berupa angka bulat yang wajar." });
+  }
+
   if (id) {
-    stmtUpdateAddon.run(name, Number(price), Number(stock || 0), Number(id));
+    const existingAddon = stmtSelectAddonById.get(Number(id));
+    if (!existingAddon) {
+      return res.status(404).json({ error: "Add-on tidak ditemukan." });
+    }
+    stmtUpdateAddon.run(cleanName, cleanPrice, cleanStock, Number(id));
+    logAudit(
+      req,
+      "ADDON_UBAH",
+      `Mengubah add-on "${cleanName}" (Rp${cleanPrice}, stok ${cleanStock})`
+    );
     res.json({ message: "Add-on berhasil diperbarui." });
   } else {
-    const info = stmtInsertAddon.run(name, Number(price), Number(stock || 100));
-    res.json({ id: info.lastInsertRowid, name, price, stock });
+    const info = stmtInsertAddon.run(cleanName, cleanPrice, cleanStock || 100);
+    logAudit(
+      req,
+      "ADDON_TAMBAH",
+      `Menambah add-on "${cleanName}" (Rp${cleanPrice}, stok ${cleanStock || 100})`
+    );
+    res.json({ id: info.lastInsertRowid, name: cleanName, price: cleanPrice, stock: cleanStock || 100 });
   }
 });
 
-// DELETE /api/units/addons/:id
-router.delete("/addons/:id", (req, res) => {
-  stmtDeleteAddon.run(req.params.id);
+// DELETE /api/units/addons/:id -> hanya admin (kasir tetap bisa kelola stok/harga)
+router.delete("/addons/:id", requireAdmin, (req, res) => {
+  const addonId = Number(req.params.id);
+  if (!Number.isInteger(addonId) || addonId <= 0) {
+    return res.status(400).json({ error: "ID add-on tidak valid." });
+  }
+  const addon = stmtSelectAddonById.get(addonId);
+  if (!addon) {
+    return res.status(404).json({ error: "Add-on tidak ditemukan." });
+  }
+  stmtDeleteAddon.run(addonId);
+  logAudit(req, "ADDON_HAPUS", `Menghapus add-on "${addon.name}" (Rp${addon.price})`);
   res.json({ message: "Add-on berhasil dihapus." });
 });
 
@@ -111,6 +150,50 @@ router.delete("/addons/:id", (req, res) => {
 router.post("/:id/start", (req, res) => {
   const unitId = Number(req.params.id);
   const { customerName, memberId, durationMode = "open", packageHours = 0, addons = [] } = req.body;
+
+  if (!Number.isInteger(unitId) || unitId <= 0) {
+    return res.status(400).json({ error: "ID unit tidak valid." });
+  }
+
+  const cleanCustomer = customerName ? String(customerName).trim() : "Umum";
+  if (cleanCustomer.length < 2 || cleanCustomer.length > 64) {
+    return res.status(400).json({ error: "Nama pelanggan harus 2-64 karakter." });
+  }
+
+  if (!["open", "package"].includes(durationMode)) {
+    return res.status(400).json({ error: "Mode durasi tidak valid." });
+  }
+
+  let cleanPackageHours = 0;
+  if (durationMode === "package") {
+    cleanPackageHours = Number(packageHours);
+    if (!Number.isInteger(cleanPackageHours) || cleanPackageHours < 1 || cleanPackageHours > 24) {
+      return res.status(400).json({ error: "Durasi paket harus bilangan bulat 1-24 jam." });
+    }
+  }
+
+  let cleanMemberId = null;
+  if (memberId) {
+    cleanMemberId = Number(memberId);
+    if (!Number.isInteger(cleanMemberId) || !stmtSelectMemberById.get(cleanMemberId)) {
+      return res.status(400).json({ error: "Member tidak ditemukan." });
+    }
+  }
+
+  if (!Array.isArray(addons)) {
+    return res.status(400).json({ error: "Daftar add-on tidak valid." });
+  }
+  const cleanAddons = addons.map((a) => ({
+    id: Number(a.id),
+    qty: Math.floor(Number(a.qty) || 0),
+  }));
+  if (
+    cleanAddons.some(
+      (a) => !Number.isInteger(a.id) || a.id <= 0 || !Number.isInteger(a.qty) || a.qty < 0 || a.qty > 99
+    )
+  ) {
+    return res.status(400).json({ error: "Item add-on tidak valid." });
+  }
 
   const unit = stmtSelectUnitById.get(unitId);
   if (!unit) return res.status(404).json({ error: "Unit tidak ditemukan." });
@@ -121,15 +204,20 @@ router.post("/:id/start", (req, res) => {
   const run = db.transaction(() => {
     const info = stmtInsertSession.run(
       unitId,
-      customerName || "Umum",
-      memberId || null,
+      cleanCustomer,
+      cleanMemberId,
       durationMode,
-      Number(packageHours) || 0
+      cleanPackageHours
     );
     const sessionId = info.lastInsertRowid;
 
-    for (const a of addons) {
+    for (const a of cleanAddons) {
       if (a.qty > 0) {
+        const addon = stmtSelectAddonById.get(a.id);
+        if (!addon) throw new Error("Item kantin tidak ditemukan.");
+        if (addon.stock < a.qty) {
+          throw new Error(`Stok ${addon.name} kurang (sisa ${addon.stock}).`);
+        }
         stmtInsertSessionAddon.run(sessionId, a.id, a.qty);
         stmtUpdateAddonStock.run(a.qty, a.id);
       }
@@ -139,7 +227,18 @@ router.post("/:id/start", (req, res) => {
     return sessionId;
   });
 
-  const sessionId = run();
+  let sessionId;
+  try {
+    sessionId = run();
+  } catch (err) {
+    return res.status(400).json({ error: err.message || "Gagal memulai sesi." });
+  }
+
+  logAudit(
+    req,
+    "SESI_MULAI",
+    `Sesi #${sessionId} dimulai di ${unit.name} untuk ${cleanCustomer} (${durationMode}${cleanPackageHours ? ` ${cleanPackageHours} jam` : ""})`
+  );
   res.json({ sessionId });
 });
 
@@ -243,6 +342,7 @@ router.post("/:id/switch", (req, res) => {
     stmtUpdateUnitStatus.run("active", targetUnitId);
   })();
 
+  logAudit(req, "SESI_PINDAH", `Sesi #${session.id} pindah dari unit #${sourceUnitId} ke ${targetUnit.name}`);
   res.json({ message: `Sesi berhasil dipindahkan ke ${targetUnit.name}.` });
 });
 
@@ -334,6 +434,11 @@ router.post("/:id/stop", (req, res) => {
   });
 
   const transactionId = run();
+  logAudit(
+    req,
+    "TRANSAKSI",
+    `Transaksi #${transactionId}: ${unit.name} / ${session.customer_name} — total Rp${total} (${paymentMethod})`
+  );
   res.json({
     transactionId,
     durationSec: activeDurationSec,
