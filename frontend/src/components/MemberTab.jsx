@@ -8,8 +8,8 @@ export default function MemberTab({ members, onAdd }) {
     <div>
       <header className="mb-5 flex items-center justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <h1 className="font-display text-xl sm:text-2xl md:text-3xl font-bold truncate">Member</h1>
-          <p style={{ color: C.textDim }} className="text-xs sm:text-sm mt-0.5 sm:mt-1 truncate sm:whitespace-normal">
+          <h1 className="text-xl sm:text-2xl font-semibold tracking-tight truncate">Member</h1>
+          <p style={{ color: C.textDim }} className="text-[13px] mt-1">
             Pelanggan tetap &amp; poin loyalti.
           </p>
         </div>
@@ -23,19 +23,22 @@ export default function MemberTab({ members, onAdd }) {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
           {members.map((m) => (
-            <Card key={m.id}>
+            <Card key={m.id} className="!p-4">
               <div className="flex items-center gap-3 mb-3">
-                <div style={{ background: C.violetDim }} className="w-10 h-10 rounded-full flex items-center justify-center font-bold shrink-0">
+                <div
+                  style={{ background: C.primarySoft, color: C.primaryDark }}
+                  className="w-10 h-10 rounded-full flex items-center justify-center font-semibold shrink-0"
+                >
                   {m.name.charAt(0).toUpperCase()}
                 </div>
                 <div className="min-w-0">
-                  <div className="font-semibold text-sm sm:text-base truncate">{m.name}</div>
-                  <div style={{ color: C.textDim }} className="text-xs truncate">{m.phone || "-"}</div>
+                  <div className="font-medium text-sm truncate" style={{ color: C.text }}>{m.name}</div>
+                  <div style={{ color: C.textDim }} className="text-xs truncate tabular">{m.phone || "-"}</div>
                 </div>
               </div>
-              <div className="flex items-center gap-2" style={{ color: C.gold }}>
+              <div className="flex items-center gap-2" style={{ color: C.warning }}>
                 <Trophy size={14} />
-                <span className="text-xs sm:text-sm font-bold">{m.points} poin</span>
+                <span className="text-xs font-semibold tabular">{m.points} poin</span>
               </div>
             </Card>
           ))}
@@ -67,7 +70,7 @@ export function AddMemberModal({ onClose, onSave }) {
       <Field label="No. HP">
         <input style={inputStyle} className="w-full rounded-lg px-3 py-2.5 text-sm outline-none" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="08xxxxxxxxxx" />
       </Field>
-      <Btn className="w-full mt-2" icon={Users} disabled={!name || submitting} onClick={submit}>
+      <Btn className="w-full mt-2 !py-2.5" icon={Users} disabled={!name || submitting} onClick={submit}>
         {submitting ? "Menyimpan..." : "Simpan Member"}
       </Btn>
     </Modal>

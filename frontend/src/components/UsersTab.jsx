@@ -1,13 +1,54 @@
 import React, { useState, useEffect } from "react";
-import { UserPlus, KeyRound, Shield, Trash2, CheckCircle2, AlertCircle } from "lucide-react";
+import {
+  UserPlus,
+  KeyRound,
+  Shield,
+  Trash2,
+  CheckCircle2,
+  AlertCircle,
+  History,
+  RefreshCw,
+} from "lucide-react";
 import { C, inputStyle } from "../styles/tokens.js";
 import { Card, Btn, Field, Modal, Badge } from "./ui.jsx";
 import { api } from "../api.js";
+import { fmtDateTimeWIB } from "../utils/format.js";
 
-export default function UsersTab({ currentUser }) {
+const AUDIT_LABEL = {
+  LOGIN: "Login",
+  LOGIN_GAGAL: "Login gagal",
+  LOGOUT: "Logout",
+  PASSWORD_UBAH: "Password diubah",
+  PASSWORD_GAGAL: "Ganti password gagal",
+  USER_TAMBAH: "User ditambah",
+  USER_HAPUS: "User dihapus",
+  SESI_MULAI: "Sesi dimulai",
+  SESI_PINDAH: "Pindah unit",
+  TRANSAKSI: "Transaksi",
+  BOOKING_TAMBAH: "Booking baru",
+  BOOKING_BATAL: "Booking dibatalkan",
+  BOOKING_CHECKIN: "Check-in booking",
+  ADDON_TAMBAH: "Add-on ditambah",
+  ADDON_UBAH: "Add-on diubah",
+  ADDON_HAPUS: "Add-on dihapus",
+  MEMBER_TAMBAH: "Member ditambah",
+};
+
+function auditTone(action) {
+  if (action === "LOGIN_GAGAL" || action === "PASSWORD_GAGAL") return "danger";
+  if (action === "TRANSAKSI") return "success";
+  if (action === "LOGIN" || action === "SESI_MULAI") return "primary";
+  return "neutral";
+}
+
+export default function UsersTab({ currentUser, onLogout }) {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
+
+  // Log aktivitas (admin)
+  const [auditLogs, setAuditLogs] = useState([]);
+  const [auditLoading, setAuditLoading] = useState(false);
 
   // Change password form
   const [oldPassword, setOldPassword] = useState("");
@@ -35,8 +76,22 @@ export default function UsersTab({ currentUser }) {
     }
   };
 
+  const loadAuditLogs = async () => {
+    if (currentUser.role !== "admin") return;
+    setAuditLoading(true);
+    try {
+      const rows = await api.getAuditLogs(100);
+      setAuditLogs(rows);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setAuditLoading(false);
+    }
+  };
+
   useEffect(() => {
     loadUsers();
+    loadAuditLogs();
   }, [currentUser]);
 
   const handleChangePassword = async (e) => {
@@ -45,9 +100,13 @@ export default function UsersTab({ currentUser }) {
     setPwdLoading(true);
     try {
       await api.changePassword({ oldPassword, newPassword });
-      setPwdMsg({ error: "", success: "Password Anda berhasil diperbarui!" });
+      setPwdMsg({
+        error: "",
+        success: "Password berhasil diperbarui. Anda akan diarahkan ke halaman login...",
+      });
       setOldPassword("");
       setNewPassword("");
+      setTimeout(() => onLogout && onLogout(), 1500);
     } catch (err) {
       setPwdMsg({ error: err.message, success: "" });
     } finally {
@@ -81,11 +140,11 @@ export default function UsersTab({ currentUser }) {
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <header className="flex items-center justify-between gap-3 mb-5">
         <div className="min-w-0 flex-1">
-          <h1 className="font-display text-xl sm:text-2xl md:text-3xl font-bold truncate">User &amp; Akses</h1>
-          <p style={{ color: C.textDim }} className="text-xs sm:text-sm mt-0.5 sm:mt-1 truncate sm:whitespace-normal">
+          <h1 className="text-xl sm:text-2xl font-semibold tracking-tight truncate">User &amp; Akses</h1>
+          <p style={{ color: C.textDim }} className="text-[13px] mt-1">
             Pengaturan akun pengelola &amp; hak akses.
           </p>
         </div>
@@ -96,11 +155,11 @@ export default function UsersTab({ currentUser }) {
         )}
       </header>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         {/* Form Ganti Password (Untuk semua user yang sedang login) */}
         <Card className="lg:col-span-1">
-          <div className="flex items-center gap-2 font-bold text-lg mb-4">
-            <KeyRound size={20} className="text-violet-400" />
+          <div className="flex items-center gap-2 font-semibold text-[15px] mb-4">
+            <KeyRound size={18} style={{ color: C.primary }} />
             <span>Ganti Kata Sandi</span>
           </div>
 
@@ -122,25 +181,29 @@ export default function UsersTab({ currentUser }) {
                 type="password"
                 style={inputStyle}
                 className="w-full rounded-lg px-3 py-2.5 text-sm outline-none"
-                placeholder="••••••••"
+                placeholder="Minimal 8 karakter"
+                minLength={8}
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 required
               />
+              <span className="text-[11px] mt-1 block" style={{ color: C.textFaint }}>
+                Minimal 8 karakter. Semua sesi login lain akan berakhir.
+              </span>
             </Field>
 
             {pwdMsg.error && (
-              <div className="text-xs font-semibold text-red-400 mb-3 flex items-center gap-1">
+              <div className="text-xs font-medium mb-3 flex items-center gap-1.5" style={{ color: C.danger }}>
                 <AlertCircle size={14} /> {pwdMsg.error}
               </div>
             )}
             {pwdMsg.success && (
-              <div className="text-xs font-semibold text-emerald-400 mb-3 flex items-center gap-1">
+              <div className="text-xs font-medium mb-3 flex items-center gap-1.5" style={{ color: C.success }}>
                 <CheckCircle2 size={14} /> {pwdMsg.success}
               </div>
             )}
 
-            <Btn type="submit" className="w-full mt-2" disabled={pwdLoading}>
+            <Btn type="submit" className="w-full mt-2 !py-2.5" disabled={pwdLoading}>
               {pwdLoading ? "Memproses..." : "Perbarui Password"}
             </Btn>
           </form>
@@ -149,33 +212,33 @@ export default function UsersTab({ currentUser }) {
         {/* Tabel Daftar Pengguna (Hanya Admin) */}
         {currentUser.role === "admin" && (
           <Card className="lg:col-span-2">
-            <div className="flex items-center justify-between font-bold text-lg mb-4">
-              <div className="flex items-center gap-2">
-                <Shield size={20} className="text-emerald-400" />
+            <div className="flex items-center justify-between mb-4 gap-2">
+              <div className="flex items-center gap-2 font-semibold text-[15px]">
+                <Shield size={18} style={{ color: C.success }} />
                 <span>Daftar Pengguna Sistem</span>
               </div>
-              <span className="text-xs font-normal" style={{ color: C.textDim }}>
-                {users.length} pengguna terdaftar
+              <span className="text-xs shrink-0" style={{ color: C.textDim }}>
+                {users.length} pengguna
               </span>
             </div>
 
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
                 <thead>
-                  <tr className="border-b border-gray-800 text-gray-400">
-                    <th className="pb-2">NAMA</th>
-                    <th className="pb-2">USERNAME</th>
-                    <th className="pb-2">HAK AKSES</th>
-                    <th className="pb-2 text-right">AKSI</th>
+                  <tr style={{ color: C.textDim }} className="border-b">
+                    <th className="pb-2.5 pr-3 font-medium">Nama</th>
+                    <th className="pb-2.5 pr-3 font-medium">Username</th>
+                    <th className="pb-2.5 pr-3 font-medium">Hak Akses</th>
+                    <th className="pb-2.5 text-right font-medium">Aksi</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-800/60">
+                <tbody>
                   {users.map((u) => (
-                    <tr key={u.id}>
-                      <td className="py-3 font-semibold text-white">{u.name}</td>
-                      <td className="py-3 font-mono">{u.username}</td>
-                      <td className="py-3">
-                        <Badge tone={u.role === "admin" ? "active" : "idle"}>
+                    <tr key={u.id} className="border-b last:border-0" style={{ borderColor: C.inset }}>
+                      <td className="py-3 pr-3 font-medium" style={{ color: C.text }}>{u.name}</td>
+                      <td className="py-3 pr-3 font-mono" style={{ color: C.textDim }}>{u.username}</td>
+                      <td className="py-3 pr-3">
+                        <Badge tone={u.role === "admin" ? "primary" : "neutral"}>
                           {u.role.toUpperCase()}
                         </Badge>
                       </td>
@@ -183,8 +246,10 @@ export default function UsersTab({ currentUser }) {
                         {u.id !== currentUser.id && (
                           <button
                             onClick={() => handleDeleteUser(u.id)}
-                            className="p-1.5 rounded bg-red-500/10 text-red-400 hover:bg-red-500/20"
+                            style={{ background: C.dangerSoft, color: C.danger, border: `1px solid ${C.dangerBorder}` }}
+                            className="p-1.5 rounded-md hover:brightness-95 transition-all"
                             title="Hapus Pengguna"
+                            aria-label="Hapus pengguna"
                           >
                             <Trash2 size={14} />
                           </button>
@@ -198,6 +263,65 @@ export default function UsersTab({ currentUser }) {
           </Card>
         )}
       </div>
+
+      {currentUser.role === "admin" && (
+        <Card>
+          <div className="flex items-center justify-between mb-4 gap-2">
+            <div className="flex items-center gap-2 font-semibold text-[15px]">
+              <History size={18} style={{ color: C.warning }} />
+              <span>Log Aktivitas</span>
+            </div>
+            <Btn
+              variant="ghost"
+              icon={RefreshCw}
+              onClick={loadAuditLogs}
+              disabled={auditLoading}
+              className="!px-2.5 !py-1.5 !text-xs"
+            >
+              {auditLoading ? "Memuat..." : "Muat ulang"}
+            </Btn>
+          </div>
+
+          {auditLogs.length === 0 ? (
+            <p className="text-xs py-4" style={{ color: C.textDim }}>
+              Belum ada aktivitas tercatat.
+            </p>
+          ) : (
+            <div className="overflow-x-auto max-h-[360px] overflow-y-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="sticky top-0" style={{ background: C.surface }}>
+                  <tr style={{ color: C.textDim }} className="border-b">
+                    <th className="pb-2.5 pr-3 font-medium whitespace-nowrap">Waktu</th>
+                    <th className="pb-2.5 pr-3 font-medium">Pengguna</th>
+                    <th className="pb-2.5 pr-3 font-medium">Aksi</th>
+                    <th className="pb-2.5 font-medium">Detail</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {auditLogs.map((log) => (
+                    <tr key={log.id} className="border-b last:border-0" style={{ borderColor: C.inset }}>
+                      <td className="py-2.5 pr-3 font-mono whitespace-nowrap" style={{ color: C.textDim }}>
+                        {fmtDateTimeWIB(log.created_at)}
+                      </td>
+                      <td className="py-2.5 pr-3 font-mono whitespace-nowrap" style={{ color: C.text }}>
+                        {log.username}
+                      </td>
+                      <td className="py-2.5 pr-3">
+                        <Badge tone={auditTone(log.action)}>
+                          {AUDIT_LABEL[log.action] || log.action}
+                        </Badge>
+                      </td>
+                      <td className="py-2.5" style={{ color: C.textDim }}>
+                        {log.detail || "-"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Card>
+      )}
 
       {showAddModal && (
         <Modal title="Tambah Pengguna Baru" onClose={() => setShowAddModal(false)}>
@@ -229,7 +353,8 @@ export default function UsersTab({ currentUser }) {
                 type="password"
                 style={inputStyle}
                 className="w-full rounded-lg px-3 py-2.5 text-sm outline-none"
-                placeholder="••••••••"
+                placeholder="Minimal 8 karakter"
+                minLength={8}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
@@ -249,12 +374,12 @@ export default function UsersTab({ currentUser }) {
             </Field>
 
             {addMsg && (
-              <div className="text-xs text-red-400 font-semibold mb-2 flex items-center gap-1">
+              <div className="text-xs font-medium mb-2 flex items-center gap-1.5" style={{ color: C.danger }}>
                 <AlertCircle size={14} /> {addMsg}
               </div>
             )}
 
-            <Btn type="submit" className="w-full mt-3" icon={UserPlus}>
+            <Btn type="submit" className="w-full mt-3 !py-2.5" icon={UserPlus}>
               Simpan Pengguna
             </Btn>
           </form>

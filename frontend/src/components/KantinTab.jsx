@@ -1,10 +1,10 @@
 import React, { useState } from "react";
 import { Coffee, Plus, Trash2, Edit2, AlertTriangle, PackageCheck } from "lucide-react";
 import { C, inputStyle } from "../styles/tokens.js";
-import { Card, Btn, Field, Modal } from "./ui.jsx";
+import { Card, Btn, Field, Modal, EmptyState } from "./ui.jsx";
 import { fmtIDR } from "../utils/format.js";
 
-export default function KantinTab({ addons = [], onRefresh }) {
+export default function KantinTab({ addons = [], onRefresh, isAdmin = false }) {
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
   const [name, setName] = useState("");
@@ -54,10 +54,10 @@ export default function KantinTab({ addons = [], onRefresh }) {
     <div>
       <header className="flex items-center justify-between gap-3 mb-5">
         <div className="min-w-0 flex-1">
-          <h1 className="font-display text-xl sm:text-2xl md:text-3xl font-bold truncate">
+          <h1 className="text-xl sm:text-2xl font-semibold tracking-tight truncate">
             Stok &amp; Kantin
           </h1>
-          <p style={{ color: C.textDim }} className="text-xs sm:text-sm mt-0.5 sm:mt-1 truncate sm:whitespace-normal">
+          <p style={{ color: C.textDim }} className="text-[13px] mt-1">
             Kelola snack &amp; minuman rental.
           </p>
         </div>
@@ -66,61 +66,70 @@ export default function KantinTab({ addons = [], onRefresh }) {
         </Btn>
       </header>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
-        {addons.map((a) => {
-          const isLowStock = (a.stock ?? 100) < 10;
-          return (
-            <Card key={a.id} className="relative overflow-hidden flex flex-col justify-between">
-              <div>
-                <div className="flex items-start justify-between mb-2">
-                  <div className="flex items-center gap-2.5 min-w-0">
+      {addons.length === 0 ? (
+        <EmptyState text="Belum ada produk kantin. Tambahkan snack atau minuman untuk mulai berjualan." />
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+          {addons.map((a) => {
+            const isLowStock = (a.stock ?? 100) < 10;
+            return (
+              <Card key={a.id} className="flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center gap-3 mb-3">
                     <div
-                      className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
-                      style={{ background: "rgba(139,107,255,0.15)", color: C.violet }}
+                      className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
+                      style={{ background: C.primarySoft, color: C.primary }}
                     >
-                      <Coffee size={18} />
+                      <Coffee size={17} />
                     </div>
                     <div className="min-w-0">
-                      <div className="font-bold text-sm sm:text-base truncate">{a.name}</div>
-                      <div className="text-xs font-semibold text-emerald-400">{fmtIDR(a.price)}</div>
+                      <div className="font-medium text-sm truncate" style={{ color: C.text }}>{a.name}</div>
+                      <div className="text-xs font-medium tabular" style={{ color: C.success }}>{fmtIDR(a.price)}</div>
                     </div>
                   </div>
-                </div>
 
-                <div className="mt-2.5 p-2 rounded-xl bg-gray-800/40 flex items-center justify-between text-xs">
-                  <span style={{ color: C.textDim }}>Sisa Stok:</span>
-                  <span className={`font-bold ${isLowStock ? "text-amber-400" : "text-white"}`}>
-                    {a.stock ?? 100} unit
-                  </span>
-                </div>
-
-                {isLowStock && (
-                  <div className="mt-2 text-[11px] font-semibold text-amber-400 flex items-center gap-1">
-                    <AlertTriangle size={12} /> Stok menipis, isi ulang!
+                  <div
+                    style={{ background: C.surface2, border: `1px solid ${C.border}` }}
+                    className="p-2 rounded-lg flex items-center justify-between text-xs"
+                  >
+                    <span style={{ color: C.textDim }}>Sisa stok</span>
+                    <span className="tabular font-semibold" style={{ color: isLowStock ? C.warning : C.text }}>
+                      {a.stock ?? 100} unit
+                    </span>
                   </div>
-                )}
-              </div>
 
-              <div className="flex gap-2 mt-3 pt-3 border-t border-gray-800/80">
-                <Btn
-                  variant="secondary"
-                  icon={Edit2}
-                  onClick={() => openEdit(a)}
-                  className="flex-1 py-1.5 text-xs"
-                >
-                  Edit
-                </Btn>
-                <Btn
-                  variant="danger"
-                  icon={Trash2}
-                  onClick={() => handleDelete(a.id)}
-                  className="py-1.5 px-3 text-xs"
-                />
-              </div>
-            </Card>
-          );
-        })}
-      </div>
+                  {isLowStock && (
+                    <div className="mt-2 text-[11px] font-medium flex items-center gap-1" style={{ color: C.warning }}>
+                      <AlertTriangle size={12} /> Stok menipis, isi ulang
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex gap-2 mt-3 pt-3" style={{ borderTop: `1px solid ${C.inset}` }}>
+                  <Btn
+                    variant="secondary"
+                    icon={Edit2}
+                    onClick={() => openEdit(a)}
+                    className="flex-1 !text-xs"
+                  >
+                    Edit
+                  </Btn>
+                  {isAdmin && (
+                    <Btn
+                      variant="dangerGhost"
+                      icon={Trash2}
+                      onClick={() => handleDelete(a.id)}
+                      title="Hapus produk"
+                      aria-label="Hapus produk"
+                      className="!px-2.5"
+                    />
+                  )}
+                </div>
+              </Card>
+            );
+          })}
+        </div>
+      )}
 
       {showAddModal && (
         <Modal
@@ -165,7 +174,7 @@ export default function KantinTab({ addons = [], onRefresh }) {
               />
             </Field>
 
-            <Btn type="submit" className="w-full mt-3" icon={PackageCheck} disabled={loading}>
+            <Btn type="submit" className="w-full mt-3 !py-2.5" icon={PackageCheck} disabled={loading}>
               {loading ? "Menyimpan..." : editingItem ? "Simpan Perubahan" : "Simpan Produk"}
             </Btn>
           </form>

@@ -1,6 +1,5 @@
 import React, { useEffect, useRef } from "react";
 import {
-  Zap,
   Play,
   Square,
   Pause,
@@ -46,10 +45,10 @@ export default function UnitsTab({
   return (
     <div>
       <header className="mb-5">
-        <h1 className="font-display text-xl sm:text-2xl md:text-3xl font-bold truncate">
+        <h1 className="text-xl sm:text-2xl font-semibold tracking-tight truncate">
           Kelola Unit POS
         </h1>
-        <p style={{ color: C.textDim }} className="text-xs sm:text-sm mt-0.5 sm:mt-1">
+        <p style={{ color: C.textDim }} className="text-[13px] mt-1">
           Kontrol sewa bilik PS, timer, dan tagihan kasir.
         </p>
       </header>
@@ -120,50 +119,45 @@ function UnitCard({ unit, upcomingBooking, now, onStart, onStop, onPause, onResu
   const addonsCost = (session?.addons || []).reduce((s, a) => s + a.price * a.qty, 0);
 
   let borderColor = C.border;
-  let timerColor = C.coral;
+  let timerColor = C.text;
   if (isActive) {
     if (isPaused) {
-      borderColor = "rgba(245,158,11,0.5)";
-      timerColor = "#f59e0b";
+      borderColor = C.warningBorder;
+      timerColor = C.warning;
     } else if (isTimeUp) {
-      borderColor = "rgba(239,68,68,0.8)";
-      timerColor = "#ef4444";
+      borderColor = C.dangerBorder;
+      timerColor = C.danger;
     } else if (isWarning) {
-      borderColor = "rgba(245,158,11,0.8)";
-      timerColor = "#f59e0b";
+      borderColor = C.warningBorder;
+      timerColor = C.warning;
     } else if (isPackageMode) {
-      borderColor = "rgba(16,185,129,0.5)";
-      timerColor = "#10b981";
+      borderColor = C.successBorder;
+      timerColor = C.success;
     } else {
-      borderColor = "rgba(139,107,255,0.5)";
-      timerColor = C.violet;
+      borderColor = C.primaryBorder;
+      timerColor = C.primary;
     }
   }
 
   return (
-    <Card
-      className={`relative overflow-hidden scanline transition-all ${
-        isTimeUp ? "animate-pulse" : ""
-      }`}
-      style={{ borderColor }}
-    >
+    <Card className="relative" style={{ borderColor }}>
+      {isTimeUp && <div className="absolute inset-x-0 top-0 h-1 rounded-t-xl" style={{ background: C.danger }} />}
+
       <div className="flex items-start justify-between gap-2 mb-3">
         <div className="min-w-0">
-          <div className="font-display font-bold text-base sm:text-lg truncate">{unit.name}</div>
-          <div style={{ color: C.textDim }} className="text-xs">
-            {unit.type} &middot; {fmtIDR(unit.rate)}/jam
+          <div className="font-semibold text-[15px] truncate" style={{ color: C.text }}>{unit.name}</div>
+          <div style={{ color: C.textDim }} className="text-xs mt-0.5">
+            {unit.type} &middot; <span className="tabular">{fmtIDR(unit.rate)}/jam</span>
           </div>
         </div>
         <div className="flex items-center gap-1.5 flex-wrap justify-end shrink-0">
           {upcomingBooking && (
-            <Badge tone="coral">
-              <Calendar size={12} className="inline shrink-0 mr-1" /> {upcomingBooking.booking_time} ({upcomingBooking.customer_name})
+            <Badge tone="warning">
+              <Calendar size={11} className="shrink-0" /> {upcomingBooking.booking_time}
             </Badge>
           )}
-          {isPackageMode && (
-            <Badge tone="violet">Paket {session.package_hours}j</Badge>
-          )}
-          <Badge tone={isPaused ? "idle" : isActive ? "active" : "idle"}>
+          {isPackageMode && <Badge tone="neutral">Paket {session.package_hours}j</Badge>}
+          <Badge tone={isPaused ? "warning" : isActive ? "primary" : "success"}>
             {isPaused ? "Paused" : isActive ? "Terpakai" : "Kosong"}
           </Badge>
         </div>
@@ -171,30 +165,33 @@ function UnitCard({ unit, upcomingBooking, now, onStart, onStop, onPause, onResu
 
       {isActive ? (
         <div>
-          <div className="flex items-center justify-between text-xs mb-1">
-            <span style={{ color: C.textDim }} className="font-medium truncate max-w-[180px]">
-              Pelanggan: <b className="text-white">{session.customer_name}</b>
+          <div className="flex items-center justify-between text-xs mb-2 gap-2">
+            <span style={{ color: C.textDim }} className="truncate">
+              Pelanggan: <b style={{ color: C.text }}>{session.customer_name}</b>
             </span>
             {session.addons && session.addons.length > 0 && (
-              <span className="text-violet-400 flex items-center gap-1 font-medium shrink-0">
-                <Coffee size={12} /> {session.addons.length} Addon
+              <span style={{ color: C.primary }} className="flex items-center gap-1 font-medium shrink-0">
+                <Coffee size={12} /> {session.addons.length} item
               </span>
             )}
           </div>
 
-          <div className="my-2 p-3 rounded-xl bg-gray-950/60 border border-gray-800/80 flex flex-col items-center justify-center">
+          <div
+            style={{ background: C.surface2, border: `1px solid ${C.border}` }}
+            className="my-2 p-3 rounded-lg flex flex-col items-center justify-center"
+          >
             {isPackageMode ? (
               <>
-                <div className="text-[10px] uppercase font-bold tracking-wider text-gray-400 mb-0.5 flex items-center gap-1">
-                  <Clock size={12} /> Sisa Waktu
-                </div>
                 <div
-                  className="font-mono text-2xl sm:text-3xl font-extrabold tracking-wider"
-                  style={{ color: timerColor }}
+                  className="text-[10px] uppercase font-semibold tracking-wider mb-1 flex items-center gap-1"
+                  style={{ color: C.textDim }}
                 >
+                  <Clock size={11} /> Sisa waktu
+                </div>
+                <div className="tabular font-mono text-3xl font-semibold tracking-tight" style={{ color: timerColor }}>
                   {fmtClock(remainingSec)}
                 </div>
-                <div className="w-full bg-gray-800 h-1.5 rounded-full mt-2 overflow-hidden">
+                <div className="w-full h-1.5 rounded-full mt-2.5 overflow-hidden" style={{ background: C.border }}>
                   <div
                     className="h-full transition-all duration-500 rounded-full"
                     style={{
@@ -206,13 +203,13 @@ function UnitCard({ unit, upcomingBooking, now, onStart, onStop, onPause, onResu
               </>
             ) : (
               <>
-                <div className="text-[10px] uppercase font-bold tracking-wider text-gray-400 mb-0.5">
-                  Waktu Berjalan
-                </div>
                 <div
-                  className="font-mono text-2xl sm:text-3xl font-extrabold tracking-wider"
-                  style={{ color: timerColor }}
+                  className="text-[10px] uppercase font-semibold tracking-wider mb-1"
+                  style={{ color: C.textDim }}
                 >
+                  Waktu berjalan
+                </div>
+                <div className="tabular font-mono text-3xl font-semibold tracking-tight" style={{ color: timerColor }}>
                   {fmtClock(activeElapsedSec)}
                 </div>
               </>
@@ -220,47 +217,53 @@ function UnitCard({ unit, upcomingBooking, now, onStart, onStop, onPause, onResu
           </div>
 
           {isTimeUp && (
-            <div className="p-2 rounded-lg bg-red-500/20 border border-red-500/40 text-red-400 text-xs font-bold text-center mb-3 flex items-center justify-center gap-1.5">
-              <Bell size={14} className="animate-bounce" /> WAKTU SEWA HABIS!
+            <div
+              style={{ background: C.dangerSoft, border: `1px solid ${C.dangerBorder}`, color: C.danger }}
+              className="p-2 rounded-lg text-xs font-semibold text-center mb-3 flex items-center justify-center gap-1.5"
+            >
+              <Bell size={13} className="animate-pulse" /> Waktu sewa habis
             </div>
           )}
 
           <div style={{ color: C.textDim }} className="text-xs mb-3 flex justify-between">
-            <span>Estimasi Biaya:</span>
-            <span className="font-semibold text-emerald-400">
+            <span>Estimasi biaya</span>
+            <span className="tabular font-semibold" style={{ color: C.success }}>
               {fmtIDR(runningCost + addonsCost)}
             </span>
           </div>
 
           <div className="grid grid-cols-2 gap-2 mb-2">
             {isPaused ? (
-              <Btn variant="secondary" icon={Play} onClick={onResume} className="w-full py-1.5 text-xs">
+              <Btn variant="secondary" icon={Play} onClick={onResume} className="w-full !text-xs">
                 Resume
               </Btn>
             ) : (
-              <Btn variant="secondary" icon={Pause} onClick={onPause} className="w-full py-1.5 text-xs">
+              <Btn variant="secondary" icon={Pause} onClick={onPause} className="w-full !text-xs">
                 Pause
               </Btn>
             )}
-            <Btn variant="ghost" icon={ArrowRightLeft} onClick={onSwitch} className="w-full py-1.5 text-xs">
+            <Btn variant="ghost" icon={ArrowRightLeft} onClick={onSwitch} className="w-full !text-xs">
               Pindah
             </Btn>
           </div>
 
-          <Btn variant="secondary" icon={Coffee} onClick={onManageAddons} className="w-full mb-2 text-xs py-1.5">
-            + Kantin / Snack ({session.addons ? session.addons.length : 0})
+          <Btn variant="subtle" icon={Coffee} onClick={onManageAddons} className="w-full mb-2 !text-xs">
+            Kantin &amp; Snack ({session.addons ? session.addons.length : 0})
           </Btn>
 
-          <Btn variant="danger" icon={Square} onClick={onStop} className="w-full py-2 text-xs sm:text-sm">
+          <Btn variant="danger" icon={Square} onClick={onStop} className="w-full">
             Stop &amp; Bayar
           </Btn>
         </div>
       ) : (
         <div>
-          <div className="h-[74px] flex items-center justify-center text-center" style={{ color: C.textDim }}>
-            <span className="text-xs">Unit siap disewakan</span>
+          <div
+            style={{ background: C.surface2, border: `1px solid ${C.border}`, color: C.textFaint }}
+            className="h-[72px] rounded-lg flex items-center justify-center text-xs mb-3"
+          >
+            Unit siap disewakan
           </div>
-          <Btn icon={Play} onClick={onStart} className="w-full mt-2 py-2 text-xs sm:text-sm">
+          <Btn icon={Play} onClick={onStart} className="w-full">
             Mulai Sewa
           </Btn>
         </div>

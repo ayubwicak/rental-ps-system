@@ -21,8 +21,8 @@ export default function SwitchUnitModal({ sourceUnit, availableUnits, onClose, o
 
   return (
     <Modal title={`Pindah Unit — ${sourceUnit.name}`} onClose={onClose}>
-      <div className="mb-4 text-xs" style={{ color: C.textDim }}>
-        Sesi bermain pelanggan <b className="text-white">{sourceUnit.session?.customer_name}</b> akan dipindahkan ke unit kosong lain. Waktu bermain tetap berlanjut tanpa terreset.
+      <div className="mb-4 text-xs leading-relaxed" style={{ color: C.textDim }}>
+        Sesi bermain pelanggan <b style={{ color: C.text }}>{sourceUnit.session?.customer_name}</b> akan dipindahkan ke unit kosong lain. Waktu bermain tetap berlanjut tanpa terreset.
       </div>
 
       <Field label="Pilih Unit Tujuan">
@@ -41,14 +41,17 @@ export default function SwitchUnitModal({ sourceUnit, availableUnits, onClose, o
             ))}
           </select>
         ) : (
-          <div className="p-3 text-center text-xs rounded-lg" style={{ background: C.surface2, color: C.coral }}>
+          <div
+            style={{ background: C.dangerSoft, border: `1px solid ${C.dangerBorder}`, color: C.danger }}
+            className="p-3 text-center text-xs rounded-lg"
+          >
             Tidak ada unit lain yang sedang kosong saat ini.
           </div>
         )}
       </Field>
 
       <Btn
-        className="w-full mt-2"
+        className="w-full mt-2 !py-2.5"
         icon={ArrowRightLeft}
         onClick={submit}
         disabled={!targetUnitId || loading}

@@ -1,19 +1,35 @@
+// Token warna memakai CSS variables sehingga satu komponen berlaku untuk
+// mode terang & gelap. Nilai palet didefinisikan di src/index.css
+// (:root untuk terang, .dark untuk gelap).
 export const C = {
-  bg: "#121018",
-  surface: "#1C1826",
-  surface2: "#241F32",
-  border: "#332C46",
-  text: "#F4F1F9",
-  textDim: "#9A92AE",
-  violet: "#8B6BFF",
-  violetDim: "#5A4A99",
-  coral: "#FF6E4E",
-  mint: "#3FDDA0",
-  gold: "#FFC24B",
+  bg: "var(--c-bg)",
+  surface: "var(--c-surface)",
+  surface2: "var(--c-surface2)",
+  inset: "var(--c-inset)",
+  border: "var(--c-border)",
+  borderStrong: "var(--c-borderStrong)",
+  text: "var(--c-text)",
+  textDim: "var(--c-textDim)",
+  textFaint: "var(--c-textFaint)",
+  primary: "var(--c-primary)",
+  primaryDark: "var(--c-primaryDark)",
+  primarySoft: "var(--c-primarySoft)",
+  primaryBorder: "var(--c-primaryBorder)",
+  fillPrimary: "var(--c-fillPrimary)",
+  fillDanger: "var(--c-fillDanger)",
+  success: "var(--c-success)",
+  successSoft: "var(--c-successSoft)",
+  successBorder: "var(--c-successBorder)",
+  danger: "var(--c-danger)",
+  dangerSoft: "var(--c-dangerSoft)",
+  dangerBorder: "var(--c-dangerBorder)",
+  warning: "var(--c-warning)",
+  warningSoft: "var(--c-warningSoft)",
+  warningBorder: "var(--c-warningBorder)",
 };
 
 export const inputStyle = {
-  background: C.surface2,
-  border: `1px solid ${C.border}`,
+  background: C.surface,
+  border: `1px solid ${C.borderStrong}`,
   color: C.text,
 };

@@ -1,19 +1,20 @@
 import React from "react";
-import { X } from "lucide-react";
+import { X, Inbox } from "lucide-react";
 import { C } from "../styles/tokens.js";
 
-export function Badge({ children, tone = "dim" }) {
+export function Badge({ children, tone = "neutral" }) {
   const tones = {
-    idle: { bg: "rgba(63,221,160,0.15)", fg: C.mint },
-    active: { bg: "rgba(255,110,78,0.15)", fg: C.coral },
-    dim: { bg: C.surface2, fg: C.textDim },
-    violet: { bg: "rgba(139,107,255,0.15)", fg: C.violet },
+    neutral: { bg: C.inset, fg: C.textDim, border: C.border },
+    success: { bg: C.successSoft, fg: C.success, border: C.successBorder },
+    danger: { bg: C.dangerSoft, fg: C.danger, border: C.dangerBorder },
+    warning: { bg: C.warningSoft, fg: C.warning, border: C.warningBorder },
+    primary: { bg: C.primarySoft, fg: C.primaryDark, border: C.primaryBorder },
   };
-  const t = tones[tone] || tones.dim;
+  const t = tones[tone] || tones.neutral;
   return (
     <span
-      style={{ background: t.bg, color: t.fg }}
-      className="px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full text-[11px] sm:text-xs font-semibold tracking-wide inline-flex items-center gap-1 shrink-0"
+      style={{ background: t.bg, color: t.fg, border: `1px solid ${t.border}` }}
+      className="px-2 py-0.5 rounded-md text-[11px] font-medium inline-flex items-center gap-1 shrink-0 whitespace-nowrap"
     >
       {children}
     </span>
@@ -32,11 +33,12 @@ export function Btn({
   ...props
 }) {
   const styles = {
-    primary: { background: C.violet, color: "#fff" },
-    secondary: { background: C.surface2, color: C.text, border: `1px solid ${C.border}` },
-    ghost: { background: "transparent", color: C.text, border: `1px solid ${C.border}` },
-    danger: { background: C.coral, color: "#fff" },
-    subtle: { background: C.surface2, color: C.text },
+    primary: { background: C.fillPrimary, color: "#fff", border: "1px solid transparent" },
+    secondary: { background: C.surface, color: C.text, border: `1px solid ${C.borderStrong}` },
+    ghost: { background: "transparent", color: C.textDim, border: `1px solid ${C.border}` },
+    danger: { background: C.fillDanger, color: "#fff", border: "1px solid transparent" },
+    dangerGhost: { background: C.dangerSoft, color: C.danger, border: `1px solid ${C.dangerBorder}` },
+    subtle: { background: C.inset, color: C.text, border: "1px solid transparent" },
   };
   return (
     <button
@@ -44,8 +46,8 @@ export function Btn({
       onClick={onClick}
       disabled={disabled}
       title={title}
-      style={{ ...styles[variant], opacity: disabled ? 0.5 : 1 }}
-      className={`px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-xl text-xs sm:text-sm font-semibold inline-flex items-center justify-center gap-1.5 sm:gap-2 transition-all cursor-pointer active:scale-95 hover:brightness-110 disabled:cursor-not-allowed whitespace-nowrap shrink-0 touch-manipulation select-none ${className}`}
+      style={{ ...styles[variant], opacity: disabled ? 0.55 : 1 }}
+      className={`px-3.5 py-2 rounded-lg text-[13px] sm:text-sm font-medium inline-flex items-center justify-center gap-2 transition-colors cursor-pointer active:scale-[0.98] disabled:cursor-not-allowed whitespace-nowrap shrink-0 select-none ${className}`}
       {...props}
     >
       {Icon && <Icon size={16} className="shrink-0" />}
@@ -58,7 +60,7 @@ export function Card({ children, className = "", style = {} }) {
   return (
     <div
       style={{ background: C.surface, border: `1px solid ${C.border}`, ...style }}
-      className={`rounded-2xl p-4 sm:p-5 ${className}`}
+      className={`rounded-xl p-4 sm:p-5 shadow-sm ${className}`}
     >
       {children}
     </div>
@@ -69,24 +71,25 @@ export function Modal({ title, onClose, children, width = "max-w-md" }) {
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4"
-      style={{ background: "rgba(8,6,14,0.75)", backdropFilter: "blur(4px)" }}
+      style={{ background: "rgba(15,23,42,0.45)", backdropFilter: "blur(2px)" }}
       onClick={onClose}
     >
       <div
         onClick={(e) => e.stopPropagation()}
         style={{ background: C.surface, border: `1px solid ${C.border}` }}
-        className={`w-full ${width} rounded-2xl p-4 sm:p-6 max-h-[90vh] overflow-y-auto shadow-2xl`}
+        className={`w-full ${width} rounded-xl p-4 sm:p-6 max-h-[90vh] overflow-y-auto shadow-xl`}
       >
-        <div className="flex items-center justify-between mb-4">
-          <h3 style={{ color: C.text }} className="text-base sm:text-lg font-bold truncate pr-2">
+        <div className="flex items-center justify-between mb-5">
+          <h3 style={{ color: C.text }} className="text-base sm:text-lg font-semibold truncate pr-2">
             {title}
           </h3>
           <button
             onClick={onClose}
-            style={{ color: C.textDim }}
-            className="hover:text-white p-1.5 rounded-lg shrink-0 hover:bg-white/10 active:scale-95 transition-all cursor-pointer"
+            style={{ color: C.textFaint }}
+            className="hover:text-[var(--c-text)] hover:bg-[var(--c-inset)] p-1.5 rounded-lg shrink-0 active:scale-95 transition-colors cursor-pointer"
+            aria-label="Tutup"
           >
-            <X size={20} />
+            <X size={18} />
           </button>
         </div>
         {children}
@@ -97,8 +100,8 @@ export function Modal({ title, onClose, children, width = "max-w-md" }) {
 
 export function Field({ label, children }) {
   return (
-    <label className="block mb-3">
-      <span style={{ color: C.textDim }} className="text-xs font-semibold uppercase tracking-wide">
+    <label className="block mb-4">
+      <span style={{ color: C.textDim }} className="text-xs font-medium">
         {label}
       </span>
       <div className="mt-1.5">{children}</div>
@@ -106,32 +109,33 @@ export function Field({ label, children }) {
   );
 }
 
-export function EmptyState({ text }) {
+export function EmptyState({ text, icon: Icon = Inbox }) {
   return (
     <div
-      style={{ border: `1px dashed ${C.border}`, color: C.textDim }}
-      className="rounded-2xl p-8 sm:p-10 text-center text-xs sm:text-sm flex flex-col items-center gap-2"
+      style={{ border: `1px dashed ${C.borderStrong}`, color: C.textDim, background: C.surface }}
+      className="rounded-xl p-8 sm:p-10 text-center text-[13px] flex flex-col items-center gap-2.5"
     >
-      {text}
+      <Icon size={22} style={{ color: C.textFaint }} />
+      <span className="max-w-sm leading-relaxed">{text}</span>
     </div>
   );
 }
 
-export function StatCard({ icon: Icon, label, value, tone }) {
+export function StatCard({ icon: Icon, label, value, tone = C.primary }) {
   return (
-    <Card className="p-3.5 sm:p-5">
-      <div className="flex items-center gap-2.5 sm:gap-3">
+    <Card className="!p-4">
+      <div className="flex items-center gap-3">
         <div
-          style={{ background: `${tone}22` }}
-          className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center shrink-0"
+          style={{ background: `color-mix(in srgb, ${tone} 12%, transparent)`, color: tone }}
+          className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0"
         >
-          <Icon size={18} color={tone} />
+          <Icon size={18} />
         </div>
         <div className="min-w-0">
-          <div style={{ color: C.textDim }} className="text-[11px] sm:text-xs font-semibold truncate">
+          <div style={{ color: C.textDim }} className="text-xs font-medium truncate">
             {label}
           </div>
-          <div className="font-display font-bold text-base sm:text-lg truncate">{value}</div>
+          <div className="font-semibold text-base sm:text-lg truncate tabular tracking-tight">{value}</div>
         </div>
       </div>
     </Card>

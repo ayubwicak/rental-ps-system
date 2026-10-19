@@ -21,7 +21,7 @@ export const NAV = [
   { key: "riwayat", label: "Riwayat", icon: History },
   { key: "member", label: "Member", icon: Users },
   { key: "laporan", label: "Laporan", icon: BarChart3 },
-  { key: "users", label: "Pengaturan", icon: ShieldCheck },
+  { key: "users", label: "Pengaturan", icon: ShieldCheck, adminOnly: true },
 ];
 
 export default function Sidebar({
@@ -41,14 +41,14 @@ export default function Sidebar({
       {isMobile && drawerOpen && (
         <div
           onClick={() => setDrawerOpen(false)}
-          style={{ background: "rgba(8,6,14,0.65)" }}
+          style={{ background: "rgba(15,23,42,0.4)" }}
           className="fixed inset-0 z-40"
         />
       )}
       <aside
         style={{
           borderRight: `1px solid ${C.border}`,
-          background: C.bg,
+          background: C.surface,
           width: sidebarWidth,
           flexShrink: 0,
           ...(isMobile
@@ -59,26 +59,31 @@ export default function Sidebar({
                 left: 0,
                 zIndex: 50,
                 transform: drawerOpen ? "translateX(0)" : "translateX(-100%)",
-                transition: "transform 0.25s ease",
+                transition: "transform 0.2s ease",
               }
             : {}),
         }}
-        className="flex flex-col py-6"
+        className="flex flex-col py-5"
       >
-        <div className="flex items-center gap-2 px-5 mb-8">
+        <div className="flex items-center gap-2.5 px-4 mb-7">
           <div
-            style={{ background: C.violet }}
-            className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg shadow-violet-500/20"
+            style={{ background: C.primary }}
+            className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
           >
-            <Gamepad2 size={20} color="#fff" />
+            <Gamepad2 size={19} color="#fff" />
           </div>
-          <span className="font-display font-bold text-lg whitespace-nowrap tracking-tight">
-            RentalKu <span className="text-xs text-violet-400 font-normal">v2.0</span>
-          </span>
+          <div className="leading-tight">
+            <div className="font-semibold text-[15px] tracking-tight" style={{ color: C.text }}>
+              RentalKu
+            </div>
+            <div className="text-[11px]" style={{ color: C.textFaint }}>
+              Sistem Penyewaan PS
+            </div>
+          </div>
         </div>
 
-        <nav className="flex flex-col gap-1 px-3">
-          {NAV.map((n) => {
+        <nav className="flex flex-col gap-0.5 px-3">
+          {NAV.filter((n) => !n.adminOnly || user.role === "admin").map((n) => {
             const Icon = n.icon;
             const active = tab === n.key;
             return (
@@ -89,12 +94,14 @@ export default function Sidebar({
                   if (isMobile) setDrawerOpen(false);
                 }}
                 style={{
-                  background: active ? "rgba(139,107,255,0.15)" : "transparent",
-                  color: active ? C.violet : C.textDim,
+                  background: active ? C.primarySoft : "transparent",
+                  color: active ? C.primaryDark : C.textDim,
                 }}
-                className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold hover:brightness-125 justify-start whitespace-nowrap transition-colors"
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm justify-start whitespace-nowrap transition-colors ${
+                  active ? "font-semibold" : "font-medium hover:bg-[var(--c-inset)] hover:text-[var(--c-text)]"
+                }`}
               >
-                <Icon size={18} className={active ? "text-violet-400" : "text-gray-400"} />
+                <Icon size={18} className="shrink-0" />
                 {n.label}
               </button>
             );
@@ -104,22 +111,24 @@ export default function Sidebar({
         <div className="mt-auto px-3 pt-4" style={{ borderTop: `1px solid ${C.border}` }}>
           <div className="flex items-center gap-2.5 px-2 py-2 mb-1">
             <div
-              style={{ background: C.violetDim }}
-              className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs flex-shrink-0 text-violet-300"
+              style={{ background: C.primarySoft, color: C.primaryDark }}
+              className="w-8 h-8 rounded-full flex items-center justify-center font-semibold text-xs flex-shrink-0"
             >
               {user.name.charAt(0).toUpperCase()}
             </div>
             <div className="min-w-0">
-              <div className="text-sm font-semibold truncate">{user.name}</div>
-              <div style={{ color: C.textDim }} className="text-xs capitalize">
+              <div className="text-sm font-medium truncate" style={{ color: C.text }}>
+                {user.name}
+              </div>
+              <div style={{ color: C.textFaint }} className="text-xs capitalize">
                 {user.role}
               </div>
             </div>
           </div>
           <button
             onClick={() => setConfirmOpen(true)}
-            style={{ color: C.coral }}
-            className="w-full flex items-center gap-2.5 px-2 py-2 rounded-xl text-sm font-semibold hover:brightness-125 transition-opacity"
+            style={{ color: C.textDim }}
+            className="w-full flex items-center gap-2.5 px-2 py-2 rounded-lg text-sm font-medium hover:bg-red-50 hover:text-red-600 transition-colors"
           >
             <LogOut size={16} />
             Keluar

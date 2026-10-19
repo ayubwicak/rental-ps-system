@@ -15,10 +15,10 @@ export default function BookingTab({ units, bookings, onAdd, onCheckIn, onSwitch
     <div>
       <header className="mb-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="min-w-0">
-          <h1 className="font-display text-xl sm:text-2xl md:text-3xl font-bold truncate">
+          <h1 className="text-xl sm:text-2xl font-semibold tracking-tight truncate">
             Booking &amp; Reservasi
           </h1>
-          <p style={{ color: C.textDim }} className="text-xs sm:text-sm mt-0.5 sm:mt-1">
+          <p style={{ color: C.textDim }} className="text-[13px] mt-1">
             Jadwal dan reservasi rental.
           </p>
         </div>
@@ -26,11 +26,11 @@ export default function BookingTab({ units, bookings, onAdd, onCheckIn, onSwitch
           <button
             type="button"
             onClick={() => setShowCompleted(!showCompleted)}
-            className="text-xs px-2.5 sm:px-3 py-2 rounded-xl font-medium border transition-colors whitespace-nowrap"
+            className="text-xs px-3 py-2 rounded-lg font-medium transition-colors whitespace-nowrap"
             style={{
-              borderColor: C.border,
-              color: showCompleted ? C.text : C.textDim,
-              background: showCompleted ? "rgba(255,255,255,0.05)" : "transparent",
+              border: `1px solid ${showCompleted ? C.primaryBorder : C.border}`,
+              color: showCompleted ? C.primaryDark : C.textDim,
+              background: showCompleted ? C.primarySoft : C.surface,
             }}
           >
             {showCompleted ? "Aktif Saja" : "Semua Status"}
@@ -53,37 +53,40 @@ export default function BookingTab({ units, bookings, onAdd, onCheckIn, onSwitch
             return (
               <Card key={b.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="font-semibold text-sm sm:text-base flex items-center gap-2">
+                  <div className="font-medium text-sm flex items-center gap-2" style={{ color: C.text }}>
                     <span className="truncate">{b.customer_name}</span>
-                    <span>&middot;</span>
-                    <span className="text-violet-300 font-bold shrink-0">{b.unit_name}</span>
+                    <span style={{ color: C.textFaint }}>&middot;</span>
+                    <span className="font-semibold shrink-0" style={{ color: C.primaryDark }}>{b.unit_name}</span>
                   </div>
-                  <div style={{ color: C.textDim }} className="text-xs mt-1 flex flex-wrap items-center gap-3">
-                    <span className="flex items-center gap-1">
-                      <Calendar size={13} className="text-violet-400 shrink-0" />
+                  <div style={{ color: C.textDim }} className="text-xs mt-1.5 flex flex-wrap items-center gap-3">
+                    <span className="flex items-center gap-1.5 tabular">
+                      <Calendar size={13} className="shrink-0" style={{ color: C.textFaint }} />
                       {b.booking_date}
                     </span>
-                    <span className="flex items-center gap-1">
-                      <Clock size={13} className="text-violet-400 shrink-0" />
+                    <span className="flex items-center gap-1.5 tabular">
+                      <Clock size={13} className="shrink-0" style={{ color: C.textFaint }} />
                       {b.booking_time} ({b.duration_hours || 1}j)
                     </span>
                     {isPending && isUnitActive && (
-                      <span className="text-amber-400 font-semibold flex items-center gap-1">
+                      <span className="font-medium flex items-center gap-1" style={{ color: C.warning }}>
                         <AlertCircle size={12} /> Bilik dipakai
                       </span>
                     )}
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between sm:justify-end gap-2 pt-2 sm:pt-0 border-t sm:border-t-0 border-gray-800 shrink-0">
-                  <Badge tone={b.status === "selesai" ? "violet" : isUnitActive ? "coral" : "idle"}>
-                    {b.status === "selesai" ? "Selesai" : isUnitActive ? "Bilik Terpakai" : "Menunggu"}
+                <div
+                  className="flex items-center justify-between sm:justify-end gap-2 pt-2.5 sm:pt-0 shrink-0"
+                  style={{ borderTop: `1px solid ${C.inset}` }}
+                >
+                  <Badge tone={b.status === "selesai" ? "neutral" : isUnitActive ? "warning" : "success"}>
+                    {b.status === "selesai" ? "Selesai" : isUnitActive ? "Bilik Terpakai" : b.status === "terjadwal" ? "Terjadwal" : "Menunggu"}
                   </Badge>
 
                   {isPending && (
                     <Btn
                       variant={isUnitActive ? "secondary" : "primary"}
-                      className="py-1.5 px-3 text-xs"
+                      className="!py-1.5 !px-3 !text-xs"
                       onClick={() => {
                         if (isUnitActive) {
                           setCheckInModalBooking(b);
@@ -124,24 +127,26 @@ export default function BookingTab({ units, bookings, onAdd, onCheckIn, onSwitch
 }
 
 function CheckInConflictModal({ booking, units, onClose, onCheckInUnit, onSwitchActiveUnit }) {
-  const currentUnit = units.find((u) => u.id === booking.unit_id);
   const idleUnits = units.filter((u) => u.status !== "active");
   const [selectedTargetUnit, setSelectedTargetUnit] = useState(idleUnits[0]?.id || "");
 
   return (
     <Modal title="Bilik Sedang Terpakai" onClose={onClose} width="max-w-md">
-      <div className="p-3 mb-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs leading-relaxed">
-        <p className="font-bold text-sm text-white mb-1">
-          {booking.unit_name} sedang dipakai!
+      <div
+        style={{ background: C.warningSoft, border: `1px solid ${C.warningBorder}`, color: C.warning }}
+        className="p-3 mb-4 rounded-lg text-xs leading-relaxed"
+      >
+        <p className="font-semibold text-[13px] mb-1" style={{ color: C.text }}>
+          {booking.unit_name} sedang dipakai
         </p>
-        Solusi check-in reservasi <b>{booking.customer_name}</b> (Jam {booking.booking_time}):
+        Solusi check-in reservasi <b>{booking.customer_name}</b> (jam {booking.booking_time}):
       </div>
 
       {idleUnits.length > 0 ? (
         <div className="space-y-3 mb-4">
-          <div className="p-3 rounded-xl bg-gray-900 border border-gray-800">
-            <label className="block text-xs font-semibold text-gray-300 mb-2">
-              Solusi 1: Check-in ke Bilik Lain
+          <div style={{ background: C.surface2, border: `1px solid ${C.border}` }} className="p-3 rounded-lg">
+            <label className="block text-xs font-medium mb-2" style={{ color: C.textDim }}>
+              Check-in ke bilik lain
             </label>
             <div className="flex gap-2">
               <select
@@ -160,24 +165,24 @@ function CheckInConflictModal({ booking, units, onClose, onCheckInUnit, onSwitch
                 icon={CheckCircle2}
                 onClick={() => onCheckInUnit(selectedTargetUnit)}
                 disabled={!selectedTargetUnit}
-                className="py-1.5 px-3 text-xs"
+                className="!py-1.5 !px-3 !text-xs"
               >
                 Pilih
               </Btn>
             </div>
           </div>
 
-          <div className="p-3 rounded-xl bg-gray-900 border border-gray-800">
-            <label className="block text-xs font-semibold text-gray-300 mb-1">
-              Solusi 2: Pindah Pemain di {booking.unit_name}
+          <div style={{ background: C.surface2, border: `1px solid ${C.border}` }} className="p-3 rounded-lg">
+            <label className="block text-xs font-medium mb-1" style={{ color: C.textDim }}>
+              Pindah pemain di {booking.unit_name}
             </label>
-            <p className="text-[11px] text-gray-400 mb-2.5">
+            <p className="text-[11px] mb-2.5" style={{ color: C.textFaint }}>
               Pindahkan sesi aktif di {booking.unit_name} ke bilik lain.
             </p>
             <Btn
               variant="secondary"
               icon={ArrowRightLeft}
-              className="w-full text-xs py-2"
+              className="w-full !text-xs"
               onClick={() => onSwitchActiveUnit(booking.unit_id)}
             >
               Pindah Sesi Aktif
@@ -185,7 +190,10 @@ function CheckInConflictModal({ booking, units, onClose, onCheckInUnit, onSwitch
           </div>
         </div>
       ) : (
-        <div className="text-xs text-red-400 p-3 rounded-xl bg-red-500/10 border border-red-500/20 mb-4">
+        <div
+          style={{ background: C.dangerSoft, border: `1px solid ${C.dangerBorder}`, color: C.danger }}
+          className="text-xs p-3 rounded-lg mb-4"
+        >
           Semua bilik saat ini sedang penuh. Harap tunggu hingga salah satu bilik selesai.
         </div>
       )}
@@ -231,20 +239,22 @@ export function AddBookingModal({ units, onClose, onSave }) {
   return (
     <Modal title="Booking Baru" onClose={onClose} width="max-w-md">
       {errorInfo && (
-        <div className="p-3 mb-4 rounded-xl bg-red-500/20 border border-red-500/40 text-red-300 text-xs leading-relaxed">
-          <p className="font-bold mb-1">{errorInfo.message}</p>
+        <div
+          style={{ background: C.dangerSoft, border: `1px solid ${C.dangerBorder}`, color: C.danger }}
+          className="p-3 mb-4 rounded-lg text-xs leading-relaxed"
+        >
+          <p className="font-semibold mb-1">{errorInfo.message}</p>
           {errorInfo.availableUnits && errorInfo.availableUnits.length > 0 && (
-            <div className="mt-2 pt-2 border-t border-red-500/30">
-              <span className="text-gray-300 font-semibold block mb-1.5">
-                Pilih bilik alternatif:
-              </span>
+            <div className="mt-2 pt-2" style={{ borderTop: `1px solid ${C.dangerBorder}` }}>
+              <span className="font-medium block mb-1.5">Pilih bilik alternatif:</span>
               <div className="flex flex-wrap gap-1.5">
                 {errorInfo.availableUnits.map((alt) => (
                   <button
                     key={alt.id}
                     type="button"
                     onClick={() => set("unitId", alt.id)}
-                    className="px-2.5 py-1 rounded-lg bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/30 font-bold transition-all text-xs"
+                    style={{ background: C.successSoft, border: `1px solid ${C.successBorder}`, color: C.success }}
+                    className="px-2.5 py-1 rounded-md font-semibold transition-colors hover:brightness-95 text-xs"
                   >
                     Pilih {alt.name}
                   </button>
@@ -314,7 +324,7 @@ export function AddBookingModal({ units, onClose, onSave }) {
       </Field>
 
       <Btn
-        className="w-full mt-2"
+        className="w-full mt-2 !py-2.5"
         icon={Calendar}
         disabled={!form.customerName || !form.date || !form.time || submitting}
         onClick={submit}

@@ -1,8 +1,10 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { io } from "socket.io-client";
+import { BellRing, X } from "lucide-react";
 import { C } from "./styles/tokens.js";
-import { api, hasToken, clearToken } from "./api.js";
+import { api, setUnauthorizedHandler } from "./api.js";
 import { useIsMobile } from "./utils/useIsMobile.js";
+import { getPreferredTheme, applyTheme } from "./utils/theme.js";
 
 import LoginScreen from "./components/LoginScreen.jsx";
 import Sidebar from "./components/Sidebar.jsx";
@@ -26,36 +28,54 @@ import PrintReceiptModal from "./components/PrintReceiptModal.jsx";
 export default function App() {
   const [user, setUser] = useState(null);
   const [checkingSession, setCheckingSession] = useState(true);
+  const [theme, setTheme] = useState(getPreferredTheme);
 
-  // Pulihkan sesi login dari token tersimpan
   useEffect(() => {
+    applyTheme(theme);
+  }, [theme]);
+
+  const toggleTheme = useCallback(() => {
+    setTheme((t) => (t === "dark" ? "light" : "dark"));
+  }, []);
+
+  // Pulihkan sesi login dari cookie httpOnly (tidak ada token di localStorage)
+  useEffect(() => {
+    setUnauthorizedHandler(() => setUser(null));
     (async () => {
-      if (hasToken()) {
-        try {
-          const { user } = await api.me();
-          setUser(user);
-        } catch {
-          clearToken();
-        }
+      try {
+        const { user } = await api.me();
+        setUser(user);
+      } catch {
+        setUser(null);
       }
       setCheckingSession(false);
     })();
+    return () => setUnauthorizedHandler(null);
+  }, []);
+
+  const handleLogout = useCallback(async () => {
+    try {
+      await api.logout();
+    } catch {
+      // Abaikan kegagalan jaringan — sesi lokal tetap diakhiri
+    }
+    setUser(null);
   }, []);
 
   if (checkingSession) return null;
-  if (!user) return <LoginScreen onLogin={setUser} />;
+  if (!user)
+    return <LoginScreen onLogin={setUser} theme={theme} onToggleTheme={toggleTheme} />;
   return (
     <MainApp
       user={user}
-      onLogout={() => {
-        clearToken();
-        setUser(null);
-      }}
+      onLogout={handleLogout}
+      theme={theme}
+      onToggleTheme={toggleTheme}
     />
   );
 }
 
-function MainApp({ user, onLogout }) {
+function MainApp({ user, onLogout, theme, onToggleTheme }) {
   const [tab, setTab] = useState("dashboard");
   const [units, setUnits] = useState([]);
   const [addons, setAddons] = useState([]);
@@ -102,8 +122,8 @@ function MainApp({ user, onLogout }) {
     const clock = setInterval(() => setNow(Date.now()), 1000);
     const poll = setInterval(refreshUnits, 15000); // Polling cadangan ditingkatkan ke 15s
 
-    // Real-time listener via WebSocket (Socket.io)
-    const socket = io();
+    // Real-time listener via WebSocket (Socket.io) — autentikasi memakai cookie sesi
+    const socket = io({ withCredentials: true });
     socket.on("sync_data", () => {
       refreshUnits();
       refreshBookings();
@@ -115,7 +135,7 @@ function MainApp({ user, onLogout }) {
 
     socket.on("new_booking_notification", (data) => {
       const sourceStr = data.isWhatsapp ? "WhatsApp Bot" : "Sistem";
-      setToast(`🔔 Booking Baru (${sourceStr}): ${data.customerName} - ${data.unitName} (${data.date} jam ${data.time})`);
+      setToast(`Booking baru (${sourceStr}): ${data.customerName} - ${data.unitName} (${data.date} jam ${data.time})`);
       setTimeout(() => setToast(null), 8000);
     });
 
@@ -202,7 +222,6 @@ function MainApp({ user, onLogout }) {
       style={{
         background: C.bg,
         color: C.text,
-        fontFamily: "'Inter', sans-serif",
         minHeight: "100vh",
       }}
     >
@@ -218,16 +237,34 @@ function MainApp({ user, onLogout }) {
         />
 
         <div className="flex-1 min-w-0 flex flex-col">
-          <TopBar tab={tab} now={now} isMobile={isMobile} onOpenDrawer={() => setDrawerOpen(true)} />
+          <TopBar
+            tab={tab}
+            now={now}
+            isMobile={isMobile}
+            onOpenDrawer={() => setDrawerOpen(true)}
+            theme={theme}
+            onToggleTheme={onToggleTheme}
+          />
 
           {toast && (
-            <div className="mx-4 mt-3 p-4 bg-emerald-600 text-white rounded-xl shadow-lg flex justify-between items-center animate-bounce">
-              <span className="font-semibold text-sm sm:text-base">{toast}</span>
-              <button onClick={() => setToast(null)} className="ml-4 font-bold opacity-80 hover:opacity-100">✕</button>
+            <div
+              style={{ background: C.surface, border: `1px solid ${C.border}`, borderLeft: `3px solid ${C.primary}` }}
+              className="fixed top-4 right-4 left-4 sm:left-auto z-[60] sm:max-w-sm p-3.5 rounded-lg shadow-lg flex items-start gap-2.5"
+            >
+              <BellRing size={16} className="shrink-0 mt-0.5" style={{ color: C.primary }} />
+              <span className="text-[13px] leading-snug flex-1" style={{ color: C.text }}>{toast}</span>
+              <button
+                onClick={() => setToast(null)}
+                className="p-0.5 rounded hover:bg-[var(--c-inset)] transition-colors"
+                style={{ color: C.textFaint }}
+                aria-label="Tutup notifikasi"
+              >
+                <X size={15} />
+              </button>
             </div>
           )}
 
-          <main className="flex-1 p-3.5 sm:p-5 md:p-8 pb-32 md:pb-8 overflow-x-hidden">
+          <main className="flex-1 p-3.5 sm:p-5 md:p-8 pb-28 md:pb-8 overflow-x-hidden">
             {tab === "dashboard" && (
               <DashboardTab
                 units={units}
@@ -251,7 +288,13 @@ function MainApp({ user, onLogout }) {
                 onManageAddons={setAddonsModalUnit}
               />
             )}
-            {tab === "kantin" && <KantinTab addons={addons} onRefresh={handleKantinSave} />}
+            {tab === "kantin" && (
+              <KantinTab
+                addons={addons}
+                onRefresh={handleKantinSave}
+                isAdmin={user.role === "admin"}
+              />
+            )}
             {tab === "booking" && (
               <BookingTab
                 units={units}
@@ -264,7 +307,9 @@ function MainApp({ user, onLogout }) {
             {tab === "riwayat" && <RiwayatTab transactions={transactions} />}
             {tab === "member" && <MemberTab members={members} onAdd={() => setMemberModal(true)} />}
             {tab === "laporan" && <LaporanTab summary={summary} />}
-            {tab === "users" && <UsersTab currentUser={user} />}
+            {tab === "users" && user.role === "admin" && (
+              <UsersTab currentUser={user} onLogout={onLogout} />
+            )}
           </main>
         </div>
       </div>

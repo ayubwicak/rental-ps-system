@@ -16,7 +16,7 @@ export default function BottomNav({ tab, setTab, onOpenDrawer }) {
         background: C.surface,
         borderTop: `1px solid ${C.border}`,
       }}
-      className="md:hidden fixed bottom-0 left-0 right-0 z-30 flex items-center justify-around px-2 py-2 shadow-2xl backdrop-blur-lg"
+      className="md:hidden fixed bottom-0 left-0 right-0 z-30 flex items-stretch justify-around px-1 py-1.5"
     >
       {items.map((item) => {
         const Icon = item.icon;
@@ -26,19 +26,14 @@ export default function BottomNav({ tab, setTab, onOpenDrawer }) {
             key={item.key}
             type="button"
             onClick={() => setTab(item.key)}
-            className="flex flex-col items-center justify-center flex-1 py-1 px-1 transition-colors"
+            className="flex flex-col items-center justify-center flex-1 py-1 px-1 rounded-lg transition-colors"
             style={{
-              color: active ? C.violet : C.textDim,
+              color: active ? C.primary : C.textDim,
+              background: active ? C.primarySoft : "transparent",
             }}
           >
-            <div
-              className={`p-1.5 rounded-xl transition-all ${
-                active ? "bg-violet-500/20 scale-105" : ""
-              }`}
-            >
-              <Icon size={20} className={active ? "text-violet-400" : "text-gray-400"} />
-            </div>
-            <span className="text-[10px] font-semibold mt-0.5 tracking-tight truncate max-w-[64px]">
+            <Icon size={19} />
+            <span className="text-[10px] font-medium mt-0.5 tracking-tight truncate max-w-[64px]">
               {item.label}
             </span>
           </button>
@@ -48,14 +43,11 @@ export default function BottomNav({ tab, setTab, onOpenDrawer }) {
       <button
         type="button"
         onClick={onOpenDrawer}
-        className="flex flex-col items-center justify-center flex-1 py-1 px-1 text-gray-400 hover:text-white transition-colors"
+        style={{ color: C.textDim }}
+        className="flex flex-col items-center justify-center flex-1 py-1 px-1 rounded-lg hover:bg-[var(--c-inset)] transition-colors"
       >
-        <div className="p-1.5 rounded-xl">
-          <Menu size={20} className="text-gray-400" />
-        </div>
-        <span className="text-[10px] font-semibold mt-0.5 tracking-tight">
-          Lainnya
-        </span>
+        <Menu size={19} />
+        <span className="text-[10px] font-medium mt-0.5 tracking-tight">Lainnya</span>
       </button>
     </div>
   );

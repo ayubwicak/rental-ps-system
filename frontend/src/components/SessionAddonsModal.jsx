@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Coffee, Plus, Minus, Check, ShoppingBag } from "lucide-react";
+import { Plus, Minus, Check, ShoppingBag } from "lucide-react";
 import { Modal, Btn } from "./ui.jsx";
 import { C } from "../styles/tokens.js";
 import { fmtIDR } from "../utils/format.js";
@@ -50,23 +50,31 @@ export default function SessionAddonsModal({ unit, addons, onClose, onConfirm })
   const totalItemCount = Object.values(selectedQty).reduce((sum, q) => sum + q, 0);
 
   return (
-    <Modal title={`Pesan Food & Drink — ${unit.name}`} onClose={onClose} width="max-w-md">
-      <div className="text-xs mb-4 p-2.5 rounded-xl bg-violet-500/10 border border-violet-500/20 text-violet-300 flex items-center justify-between">
-        <span>Pelanggan: <b className="text-white">{unit.session?.customer_name}</b></span>
-        <span className="flex items-center gap-1 font-semibold">
-          <ShoppingBag size={14} /> {totalItemCount} Item Dipesan
+    <Modal title={`Pesan Kantin — ${unit.name}`} onClose={onClose} width="max-w-md">
+      <div
+        style={{ background: C.primarySoft, border: `1px solid ${C.primaryBorder}` }}
+        className="text-xs mb-4 p-2.5 rounded-lg flex items-center justify-between gap-2"
+      >
+        <span style={{ color: C.textDim }} className="truncate">
+          Pelanggan: <b style={{ color: C.text }}>{unit.session?.customer_name}</b>
+        </span>
+        <span className="flex items-center gap-1 font-medium shrink-0" style={{ color: C.primaryDark }}>
+          <ShoppingBag size={13} /> {totalItemCount} item
         </span>
       </div>
 
       {error && (
-        <div className="p-3 mb-4 rounded-xl bg-red-500/20 border border-red-500/30 text-red-300 text-xs font-semibold">
+        <div
+          style={{ background: C.dangerSoft, border: `1px solid ${C.dangerBorder}`, color: C.danger }}
+          className="p-3 mb-4 rounded-lg text-xs font-medium"
+        >
           {error}
         </div>
       )}
 
-      <div className="space-y-3 max-h-80 overflow-y-auto pr-1 mb-4">
+      <div className="space-y-2.5 max-h-80 overflow-y-auto pr-1 mb-4">
         {addons.length === 0 ? (
-          <div className="text-center py-6 text-xs text-gray-500">
+          <div className="text-center py-6 text-xs" style={{ color: C.textFaint }}>
             Belum ada menu kantin/add-on yang terdaftar.
           </div>
         ) : (
@@ -78,18 +86,18 @@ export default function SessionAddonsModal({ unit, addons, onClose, onConfirm })
             return (
               <div
                 key={item.id}
-                className="p-3 rounded-xl border flex items-center justify-between transition-colors"
+                className="p-3 rounded-lg border flex items-center justify-between transition-colors"
                 style={{
-                  background: qty > 0 ? "rgba(139,107,255,0.08)" : C.surface,
-                  borderColor: qty > 0 ? "rgba(139,107,255,0.3)" : C.border,
+                  background: qty > 0 ? C.primarySoft : C.surface,
+                  borderColor: qty > 0 ? C.primaryBorder : C.border,
                 }}
               >
                 <div className="min-w-0 pr-2">
-                  <div className="font-semibold text-sm truncate">{item.name}</div>
-                  <div className="text-xs text-gray-400 flex items-center gap-2 mt-0.5">
+                  <div className="font-medium text-sm truncate" style={{ color: C.text }}>{item.name}</div>
+                  <div className="text-xs flex items-center gap-2 mt-0.5 tabular" style={{ color: C.textDim }}>
                     <span>{fmtIDR(item.price)}</span>
                     <span>&middot;</span>
-                    <span className={item.stock > 0 ? "text-emerald-400" : "text-red-400"}>
+                    <span style={item.stock > 0 ? { color: C.success } : { color: C.danger }}>
                       Stok: {item.stock}
                     </span>
                   </div>
@@ -97,27 +105,34 @@ export default function SessionAddonsModal({ unit, addons, onClose, onConfirm })
 
                 <div className="flex items-center gap-2 flex-shrink-0">
                   {qty > 0 && (
-                    <span className="text-xs font-bold text-emerald-400 mr-1">
+                    <span className="text-xs font-semibold tabular" style={{ color: C.success }}>
                       {fmtIDR(itemTotal)}
                     </span>
                   )}
-                  <div className="flex items-center gap-1.5 bg-gray-900/80 p-1 rounded-lg border border-gray-800">
+                  <div
+                    style={{ background: C.surface2, border: `1px solid ${C.border}` }}
+                    className="flex items-center gap-1.5 p-1 rounded-lg"
+                  >
                     <button
                       type="button"
                       disabled={qty <= 0}
                       onClick={() => updateQty(item.id, -1)}
-                      className="w-6 h-6 rounded flex items-center justify-center text-gray-300 hover:bg-gray-800 disabled:opacity-30"
+                      style={{ color: C.textDim }}
+                      className="w-6 h-6 rounded-md flex items-center justify-center hover:bg-[var(--c-inset)] disabled:opacity-30 transition-colors"
+                      aria-label={`Kurangi ${item.name}`}
                     >
                       <Minus size={14} />
                     </button>
-                    <span className="w-6 text-center font-mono text-sm font-bold">
+                    <span className="w-6 text-center tabular text-sm font-semibold" style={{ color: C.text }}>
                       {qty}
                     </span>
                     <button
                       type="button"
                       disabled={isOutOfStock}
                       onClick={() => updateQty(item.id, 1)}
-                      className="w-6 h-6 rounded flex items-center justify-center text-violet-300 hover:bg-violet-600/30 disabled:opacity-30"
+                      style={{ background: C.fillPrimary, color: "#fff" }}
+                      className="w-6 h-6 rounded-md flex items-center justify-center disabled:opacity-30 transition-opacity"
+                      aria-label={`Tambah ${item.name}`}
                     >
                       <Plus size={14} />
                     </button>
@@ -129,22 +144,25 @@ export default function SessionAddonsModal({ unit, addons, onClose, onConfirm })
         )}
       </div>
 
-      <div className="pt-3 border-t border-gray-800/80 flex items-center justify-between mb-4">
-        <span className="text-xs text-gray-400">Total Tambahan:</span>
-        <span className="font-display font-extrabold text-base text-emerald-400">
+      <div
+        style={{ borderTop: `1px solid ${C.border}` }}
+        className="pt-3 flex items-center justify-between mb-4"
+      >
+        <span className="text-xs" style={{ color: C.textDim }}>Total tambahan:</span>
+        <span className="font-semibold text-base tabular" style={{ color: C.success }}>
           {fmtIDR(totalCost)}
         </span>
       </div>
 
       <div className="flex gap-2">
-        <Btn variant="ghost" onClick={onClose} className="flex-1">
+        <Btn variant="ghost" onClick={onClose} className="flex-1 !py-2.5">
           Batal
         </Btn>
         <Btn
           icon={Check}
           onClick={handleSave}
           disabled={loading}
-          className="flex-1"
+          className="flex-1 !py-2.5"
         >
           {loading ? "Menyimpan..." : "Simpan Pesanan"}
         </Btn>

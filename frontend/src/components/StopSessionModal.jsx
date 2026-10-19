@@ -60,14 +60,14 @@ export default function StopSessionModal({ unit, now, members = [], onClose, onC
 
   return (
     <Modal title={`Selesai — ${unit.name}`} onClose={onClose}>
-      <div style={{ background: C.surface2 }} className="rounded-xl p-4 mb-4">
+      <div style={{ background: C.surface2, border: `1px solid ${C.border}` }} className="rounded-lg p-4 mb-4">
         <div className="flex justify-between text-sm mb-2">
           <span style={{ color: C.textDim }}>Pelanggan</span>
-          <span className="font-semibold">{session.customer_name}</span>
+          <span className="font-medium" style={{ color: C.text }}>{session.customer_name}</span>
         </div>
         <div className="flex justify-between text-sm mb-2">
           <span style={{ color: C.textDim }}>Mode Sewa</span>
-          <span className="font-semibold text-violet-400">
+          <span className="font-medium" style={{ color: C.primaryDark }}>
             {session.duration_mode === "package"
               ? `Paket ${session.package_hours} Jam`
               : "Open Billing"}
@@ -75,54 +75,57 @@ export default function StopSessionModal({ unit, now, members = [], onClose, onC
         </div>
         <div className="flex justify-between text-sm mb-2">
           <span style={{ color: C.textDim }}>Durasi Berjalan</span>
-          <span className="font-mono font-semibold">{fmtClock(activeDurationSec)}</span>
+          <span className="tabular font-mono font-medium" style={{ color: C.text }}>{fmtClock(activeDurationSec)}</span>
         </div>
         <div className="flex justify-between text-sm mb-2">
           <span style={{ color: C.textDim }}>Biaya Sewa</span>
-          <span>{fmtIDR(rentalCost)}</span>
+          <span className="tabular" style={{ color: C.text }}>{fmtIDR(rentalCost)}</span>
         </div>
         {addonsCost > 0 && (
           <div className="flex justify-between text-sm mb-2">
             <span style={{ color: C.textDim }}>Biaya Tambahan</span>
-            <span>{fmtIDR(addonsCost)}</span>
+            <span className="tabular" style={{ color: C.text }}>{fmtIDR(addonsCost)}</span>
           </div>
         )}
 
         {totalDiscount > 0 && (
-          <div className="flex justify-between text-sm mb-2 text-red-400 font-semibold">
+          <div className="flex justify-between text-sm mb-2 font-medium" style={{ color: C.danger }}>
             <span>Total Potongan</span>
-            <span>-{fmtIDR(totalDiscount)}</span>
+            <span className="tabular">-{fmtIDR(totalDiscount)}</span>
           </div>
         )}
 
         <div
-          style={{ borderTop: `1px solid ${C.border}` }}
-          className="flex justify-between text-base font-bold pt-2 mt-2"
+          style={{ borderTop: `1px solid ${C.borderStrong}` }}
+          className="flex justify-between text-base font-semibold pt-2.5 mt-2.5"
         >
-          <span>TOTAL BAYAR</span>
-          <span style={{ color: C.mint }}>{fmtIDR(grandTotal)}</span>
+          <span style={{ color: C.text }}>TOTAL BAYAR</span>
+          <span className="tabular" style={{ color: C.success }}>{fmtIDR(grandTotal)}</span>
         </div>
       </div>
 
       {member && member.points > 0 && (
-        <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 mb-4">
-          <div className="flex items-center gap-1.5 text-xs font-bold text-amber-400 mb-1">
+        <div
+          style={{ background: C.warningSoft, border: `1px solid ${C.warningBorder}` }}
+          className="p-3 rounded-lg mb-4"
+        >
+          <div className="flex items-center gap-1.5 text-xs font-semibold mb-1.5" style={{ color: C.warning }}>
             <Award size={14} /> Tukar Poin Member ({member.points} poin tersedia)
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-300">Tukar Poin:</span>
+            <span className="text-xs" style={{ color: C.textDim }}>Tukar poin:</span>
             <input
               type="number"
               min="0"
               max={member.points}
               style={inputStyle}
-              className="w-20 rounded px-2 py-1 text-xs text-center outline-none"
+              className="w-20 rounded-md px-2 py-1 text-xs text-center outline-none tabular"
               value={redeemPoints}
               onChange={(e) =>
                 setRedeemPoints(Math.min(member.points, Math.max(0, parseInt(e.target.value) || 0)))
               }
             />
-            <span className="text-xs text-emerald-400 font-semibold">
+            <span className="text-xs font-medium tabular" style={{ color: C.success }}>
               (Hemat {fmtIDR(redeemPoints * 200)})
             </span>
           </div>
@@ -130,14 +133,14 @@ export default function StopSessionModal({ unit, now, members = [], onClose, onC
       )}
 
       <Field label="Diskon / Voucher (Opsional)">
-        <div className="grid grid-cols-2 gap-2 mb-3">
+        <div className="grid grid-cols-2 gap-2">
           <div className="relative">
-            <Tag size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+            <Tag size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2" style={{ color: C.textFaint }} />
             <input
               type="number"
               min="0"
               style={inputStyle}
-              className="w-full rounded-lg pl-8 pr-2 py-2 text-xs outline-none"
+              className="w-full rounded-lg pl-8 pr-2 py-2 text-xs outline-none tabular"
               placeholder="Potongan (Rp)"
               value={discountAmount || ""}
               onChange={(e) => setDiscountAmount(Math.max(0, parseInt(e.target.value) || 0))}
@@ -146,7 +149,7 @@ export default function StopSessionModal({ unit, now, members = [], onClose, onC
           <input
             style={inputStyle}
             className="w-full rounded-lg px-2.5 py-2 text-xs outline-none"
-            placeholder="Alasan (Misal: Event Promo)"
+            placeholder="Alasan (mis. promo)"
             value={discountReason}
             onChange={(e) => setDiscountReason(e.target.value)}
           />
@@ -161,11 +164,11 @@ export default function StopSessionModal({ unit, now, members = [], onClose, onC
               type="button"
               onClick={() => setMethod(m.id)}
               style={{
-                background: method === m.id ? "rgba(139,107,255,0.15)" : C.surface2,
-                border: `1px solid ${method === m.id ? C.violet : C.border}`,
-                color: method === m.id ? C.violet : C.text,
+                background: method === m.id ? C.primarySoft : C.surface,
+                border: `1px solid ${method === m.id ? C.primary : C.borderStrong}`,
+                color: method === m.id ? C.primaryDark : C.textDim,
               }}
-              className="rounded-xl py-3 flex flex-col items-center gap-1 text-xs font-semibold"
+              className="rounded-lg py-3 flex flex-col items-center gap-1 text-xs font-medium transition-colors"
             >
               <m.icon size={16} />
               {m.label}
@@ -174,7 +177,7 @@ export default function StopSessionModal({ unit, now, members = [], onClose, onC
         </div>
       </Field>
 
-      <Btn className="w-full mt-2" icon={CheckCircle2} onClick={submit} disabled={submitting}>
+      <Btn className="w-full mt-2 !py-2.5" icon={CheckCircle2} onClick={submit} disabled={submitting}>
         {submitting ? "Memproses..." : "Bayar Sekarang"}
       </Btn>
     </Modal>

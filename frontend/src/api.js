@@ -1,21 +1,28 @@
 const API_URL = import.meta.env.VITE_API_URL || "/api";
 
-function getToken() {
-  return localStorage.getItem("rentalku_token");
+// Sesi disimpan pada cookie httpOnly yang dikelola server (bukan localStorage).
+// Handler ini dipanggil saat server membalas 401 agar UI kembali ke halaman login.
+let unauthorizedHandler = null;
+
+export function setUnauthorizedHandler(fn) {
+  unauthorizedHandler = typeof fn === "function" ? fn : null;
 }
 
 async function request(path, { method = "GET", body, auth = true } = {}) {
   const headers = { "Content-Type": "application/json" };
-  if (auth) {
-    const token = getToken();
-    if (token) headers.Authorization = `Bearer ${token}`;
-  }
   const res = await fetch(`${API_URL}${path}`, {
     method,
     headers,
+    credentials: "include",
     body: body ? JSON.stringify(body) : undefined,
   });
   const data = await res.json().catch(() => ({}));
+
+  // Sesi berakhir / token tidak berlaku: beri tahu aplikasi untuk kembali ke login
+  if (res.status === 401 && auth) {
+    if (unauthorizedHandler) unauthorizedHandler();
+  }
+
   if (!res.ok) {
     const err = new Error(data.error || "Terjadi kesalahan pada server.");
     err.availableUnits = data.availableUnits;
@@ -29,11 +36,16 @@ export const api = {
   // auth
   login: (username, password) =>
     request("/auth/login", { method: "POST", body: { username, password }, auth: false }),
+  logout: () => request("/auth/logout", { method: "POST", auth: false }),
   me: () => request("/auth/me"),
+  getPublicStats: () => request("/public/stats", { auth: false }),
   getUsers: () => request("/auth/users"),
   addUser: (payload) => request("/auth/users", { method: "POST", body: payload }),
   deleteUser: (id) => request(`/auth/users/${id}`, { method: "DELETE" }),
   changePassword: (payload) => request("/auth/change-password", { method: "POST", body: payload }),
+
+  // audit
+  getAuditLogs: (limit = 100) => request(`/audit?limit=${Number(limit) || 100}`),
 
   // units / sessions
   getUnits: () => request("/units"),
@@ -70,13 +82,3 @@ export const api = {
   getTransactions: () => request("/transactions"),
   getReportSummary: () => request("/transactions/report/summary"),
 };
-
-export function saveToken(token) {
-  localStorage.setItem("rentalku_token", token);
-}
-export function clearToken() {
-  localStorage.removeItem("rentalku_token");
-}
-export function hasToken() {
-  return Boolean(getToken());
-}
